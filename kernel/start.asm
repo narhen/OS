@@ -49,8 +49,8 @@ _start:
     mov     gs, ax
     call    available_ram
     push    eax ; third argument
-    push dword 0x1004 ; second argument
-    push dword 0x1000 ; first argument
+    push dword [0x1000] ; second argument
+    push dword 0x1004 ; first argument
     call    init
     jmp     $ ; Should really never return here
 

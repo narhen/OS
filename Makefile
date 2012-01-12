@@ -11,7 +11,8 @@ boot.o: kernel.o
 	$(MAKE) $(SLP) SYS_BLOCKS=$(shell echo `wc -c kernel/image | sed -e 's/[^0-9]//g'` / 512 | bc)  -C boot/
 
 kernel.o:
-	$(MAKE) $(SLP) -C kernel/
+	$(MAKE) -C lib
+	$(MAKE) $(SLP) -C kernel
 
 clean:
 	$(MAKE) -C boot clean

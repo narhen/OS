@@ -2,18 +2,21 @@ CC = gcc
 LD = ld
 AS = nasm
 
-CFLAGS = -Wall -nostdinc -I ../include -O2 -m32
+CFLAGS = -Wall -nostdinc -I ../include -O2 -m32 -g
 ASFLAGS = -f elf32 -Ox -DSYS_LOADPOINT=$(SYS_LOADPOINT)
-LDFLAGS = -s -x -T kernel.ld
+LDFLAGS = -x -T kernel.ld
 
-KERNOBJS = start.o init.o
+KERNOBJS = start.o init.o page.o
 
 all: $(KERNOBJS)
-	$(LD) $(LDFLAGS) $(KERNOBJS)  -o start
-	objcopy -O binary -R .comment -R .shstrtab start
+	$(LD) $(LDFLAGS) $(KERNOBJS) ../lib/string.o  -o start_sym
+	objcopy -O binary -R .comment -R .shstrtab start_sym start
 	$(MAKE) -C ../build
 	../build/mkimg ./start > image
 	$(RM) ./start
+
+page.o:
+	$(CC) $(CFLAGS) -c page.c
 
 .c.o:
 	$(CC) $(CFLAGS) -c $<

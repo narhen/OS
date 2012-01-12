@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Wall -nostdinc -I ../include -O2 -m32
 
-OBJS = sync.o
+OBJS = sync.o string.o
 
 all: $(OBJS)
 
