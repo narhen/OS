@@ -25,6 +25,6 @@ page.o:
 	$(AS) $(ASFLAGS) -o $@ $<
 
 clean:
-	-$(RM) image
+	-$(RM) image start_sym
 	-$(RM) *.o
 	$(MAKE) -C ../build clean
