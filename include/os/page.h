@@ -1,6 +1,8 @@
 #ifndef __PAGE_H
 #define __PAGE_H
 
+#include <os/boot.h>
+
 #define PAGE_SIZE 4096
 #define PAGE_OFFSET 0xfff
 

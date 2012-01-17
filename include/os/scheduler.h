@@ -2,6 +2,8 @@
 #define __SCHEDULER_H
 
 #include <os/pid.h>
+#include <os/list.h>
+#include <os/util.h>
 
 #define JOB_RUNNING         (1 << 0)
 #define JOB_SLEEPING        (1 << 1)
@@ -15,25 +17,27 @@
 struct pcb {
     pid_t pid;
     struct pcb *parent, *child;
-    DECLARE_LIST(siblings);
+    dllist_t siblings;
+
     unsigned int status;
     void *p_dir;
     struct _tss *tss;
     long kern_esp, user_esp;
-    DECLARE_LIST(run_queue);
+
+    dllist_t run_queue;
 };
 
 struct __attribute__((packed)) _tss {
-    short reserved;
+    short reserved0;
     short link;
     int esp0;
-    short reserved;
+    short reserved1;
     short ss0;
     int esp1;
-    short reserved;
+    short reserved2;
     short ss1;
     int esp2;
-    short reserved;
+    short reserved3;
     short ss2;
     int cr3;
     int eip;
@@ -46,22 +50,27 @@ struct __attribute__((packed)) _tss {
     int ebp;
     int esi;
     int edi;
-    short reserved;
+    short reserved4;
     short es;
-    short reserved;
+    short reserved5;
     short cs;
-    short reserved;
+    short reserved6;
     short ss;
-    short reserved;
+    short reserved7;
     short ds;
-    short reserved;
+    short reserved8;
     short fs;
-    short reserved;
+    short reserved9;
     short gs;
-    short reserved;
+    short reserved10;
     short ldtr;
     short iopb_offset;
-    short reserved;
+    short reserved11;
 };
+
+extern void scheduler_init(void);
+extern void the_architect_init(void);
+
+extern struct pcb *current_running;
 
 #endif

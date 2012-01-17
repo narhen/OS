@@ -1,4 +1,3 @@
-#include <os/boot.h>
 #include <os/page.h>
 #include <string.h>
 
@@ -79,6 +78,9 @@ int paging_init(struct memory_map *map, int n, unsigned long max_addr)
         } else
             mem_map[0].page[i].flag = PAGEFL_UNUSABLE;
     }
+    /* TODO:
+     *  - mark all kernel-code pages PAGEFL_PINNED
+     */
 
     return 1;
 }

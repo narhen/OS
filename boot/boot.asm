@@ -104,7 +104,7 @@ mem_detect_e820:
     cmp dword   [di + 0x10], 0x05
     jne         .good
     mov dword   [di + 0x10], 0x02
-.good
+.good:
     cmp dword   ebx, 0x00
     jne         .loop
     xor dword   eax, eax

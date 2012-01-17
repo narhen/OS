@@ -6,7 +6,7 @@ CFLAGS = -Wall -nostdinc -I ../include -O2 -m32 -g
 ASFLAGS = -f elf32 -Ox -DSYS_LOADPOINT=$(SYS_LOADPOINT)
 LDFLAGS = -x -T kernel.ld
 
-KERNOBJS = start.o init.o page.o
+KERNOBJS = start.o init.o page.o scheduler.o pid.o kthread.o kpanic.o
 
 all: $(KERNOBJS)
 	$(LD) $(LDFLAGS) $(KERNOBJS) ../lib/string.o  -o start_sym
