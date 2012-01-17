@@ -7,17 +7,28 @@ static struct mem_chunk mem_map[1];
 #define set_bit(map, n) (((char *)map)[n / 8] |= 1 << (n % 8))
 #define clear_bit(map, n) (((char *)map)[n / 8] &= ~(1 << (n % 8)))
 
-#define pgnum_to_page(chunk, n) (&(chunk)->page[(n)])
+inline struct page_descriptor *pgnum_to_page(struct mem_chunk *chunk, int n)
+{
+    return &chunk->page[n];
+}
 
-static inline int get_free(int num, unsigned char *bitmap, unsigned siz)
+inline struct page_descriptor *paddr_to_page(unsigned long paddr)
+{
+    return pgnum_to_page(&mem_map[paddr / (CHUNK_SIZE * PAGE_SIZE)],
+            paddr / PAGE_SIZE);
+}
+
+static int get_free(int num, unsigned char *bitmap, unsigned siz)
 {
     unsigned mask = 1, tmp, i, j;
+    int tmp2;
 
     if (num == 0)
         return -1;
 
-    while (num <= 0)
-        mask |= 1 << num--;
+    tmp2 = num - 1;
+    while (tmp2 > 0)
+        mask |= 1 << tmp2--;
 
     for (i = 0; i < siz; ++i, bitmap++) {
         tmp = mask;
@@ -49,21 +60,24 @@ int paging_init(struct memory_map *map, int n, unsigned long max_addr)
         mem_map[0].page[i].paddr = addr;
         mem_map[0].page[i].num_refs = 0;
 
-        if (map[j].addr_lo + map[j].length_lo < addr)
-            j++;
+        if (j < n) {
+            if (map[j].addr_lo + map[j].length_lo < addr)
+                j++;
 
-        switch (map[j].type) {
-            case MEM_AREA_NORMAL:
-                mem_map[i].flag = PAGEFL_RECLAIMABLE;
-                break;
-            case MEM_AREA_UNUSABLE:
-                mem_map[i].flag = PAGEFL_UNUSABLE;
-                set_bit(mem_map[i].bitmap, i);
-                break;
-            default:
-                mem_map[i].flag = PAGEFL_UNUSABLE;
-                break;
-        }
+            switch (map[j].type) {
+                case MEM_AREA_NORMAL:
+                    mem_map[0].page[i].flag = PAGEFL_RECLAIMABLE;
+                    break;
+                case MEM_AREA_UNUSABLE:
+                    mem_map[0].page[i].flag = PAGEFL_UNUSABLE;
+                    set_bit(mem_map[0].bitmap, i);
+                    break;
+                default:
+                    mem_map[0].page[i].flag = PAGEFL_UNUSABLE;
+                    break;
+            }
+        } else
+            mem_map[0].page[i].flag = PAGEFL_UNUSABLE;
     }
 
     return 1;
@@ -80,10 +94,10 @@ struct page_descriptor *pages_alloc(int num, unsigned flag)
         chunk = &mem_map[0];
         if (chunk->flag & MEM_CHUNKFL_FULL)
             return NULL;
-        lim = 4096;
+        lim = PAGE_SIZE;
     } else {
         chunk = &mem_map[0];
-        lim = PAGE_SIZE * 8;
+        lim = PAGE_SIZE;
     }
 
     if ((num = get_free(num, chunk->bitmap, lim)) == -1)
@@ -96,7 +110,7 @@ struct page_descriptor *pages_alloc(int num, unsigned flag)
     return page;
 }
 
-void *page_alloc(unsigned flag)
+inline struct page_descriptor *page_alloc(unsigned flag)
 {
     return pages_alloc(1, flag);
 }

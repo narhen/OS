@@ -31,5 +31,11 @@ struct mem_chunk {
 };
 
 extern int paging_init(struct memory_map *, int, unsigned long);
+extern struct page_descriptor *pages_alloc(int num, unsigned flag);
+extern inline struct page_descriptor *page_alloc(unsigned flag);
+extern int page_free(unsigned long *paddr);
+
+extern inline struct page_descriptor *pgnum_to_page(struct mem_chunk *chunk, int n);
+extern inline struct page_descriptor *paddr_to_page(unsigned long paddr);
 
 #endif
