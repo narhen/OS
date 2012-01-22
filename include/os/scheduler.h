@@ -14,6 +14,9 @@
 
 #define IS_THREAD(pcb) (pcb->user_esp == 0)
 
+#define KERNEL_CS   0x08
+#define KERNEL_DS   0x10
+
 struct pcb {
     pid_t pid;
     struct pcb *parent, *child;
@@ -28,17 +31,17 @@ struct pcb {
 };
 
 struct __attribute__((packed)) _tss {
-    short reserved0;
     short link;
+    short reserved0;
     int esp0;
-    short reserved1;
     short ss0;
+    short reserved1;
     int esp1;
-    short reserved2;
     short ss1;
+    short reserved2;
     int esp2;
-    short reserved3;
     short ss2;
+    short reserved3;
     int cr3;
     int eip;
     int eflags;
@@ -50,22 +53,22 @@ struct __attribute__((packed)) _tss {
     int ebp;
     int esi;
     int edi;
-    short reserved4;
     short es;
-    short reserved5;
+    short reserved4;
     short cs;
-    short reserved6;
+    short reserved5;
     short ss;
-    short reserved7;
+    short reserved6;
     short ds;
-    short reserved8;
+    short reserved7;
     short fs;
-    short reserved9;
+    short reserved8;
     short gs;
+    short reserved9;
+    short ldt_segment_selector;
     short reserved10;
-    short ldtr;
-    short iopb_offset;
-    short reserved11;
+    short trap;
+    short iomap_base_address;
 };
 
 extern void scheduler_init(void);

@@ -14,6 +14,9 @@ BITS 32
 %define SCREEN_ADDR 0xb8000
 %define PAGE_DIRECTORY 0x8000
 
+%define HZ 100
+%define TIMER_INTERRUPT_FRQ 1193180 / HZ
+
 %if PAGE_DIRECTORY + 4096 * 5 - 1 >= SYS_LOADPOINT
     %error "Not enough space for page directories and tables!"
 %endif
@@ -35,9 +38,6 @@ _start:
     mov     es, ax
     mov     fs, ax
     mov     gs, ax
-    call    clear_screen
-    mov     esi, msg_welcome
-    call    print
     call    setup_paging
     call    load_gdt
     ; reload segment regsters after we have changed gdt
@@ -47,12 +47,14 @@ _start:
     mov     es, ax
     mov     fs, ax
     mov     gs, ax
+    push    ebx
+    call    pit_init
     call    available_ram
     push    eax ; third argument
     push dword [0x1000] ; second argument
     push dword 0x1004 ; first argument
     call    init
-    jmp     $ ; Should really never return here
+    ;never returns here
 
 ; set up paging and 1 to 1 mapping for the first 16 MB of RAM
 setup_paging:
@@ -79,47 +81,6 @@ setup_paging:
     mov     eax, cr0
     or      eax, 0x80000000 ; set the PE flag in cr0
     mov     cr0, eax
-    ret
-
-db 0
-print:
-    xor     edx, edx
-    mov     dl, [print - 1]
-    mov     eax, edx
-    inc     edx
-    cmp     dl, 26
-    jle     .over
-    mov     dl, 0
-.over:
-    mov     [print - 1], dl
-    mov     edx, 80
-    mul     edx
-    shl     eax, 1
-    mov     ecx, eax
-    mov     eax, 0x0100
-.loop:
-    lodsb
-    cmp     al, 0x00
-    je      .return
-    mov     [SCREEN_ADDR + ecx], ax
-    add     ecx, 2
-    inc     ah
-    cmp     ah, 0x10
-    jne     .loop
-    mov     ah, 1
-    jmp     .loop
-.return:
-    ret
-
-clear_screen:
-    mov     ecx, 25*80+80
-    mov     eax, 0x0700
-    xor     edx, edx
-.loop:
-    mov     [SCREEN_ADDR + edx], ax
-    add     edx, 2
-    cmp     edx, ecx
-    jnz     .loop
     ret
 
 ; returns max address in eax
@@ -153,6 +114,17 @@ load_gdt:
     lgdt        [gdt_descriptor]
     ret
 
+pit_init:
+    push    eax
+    mov     al, 0x36 ; channel 0, LSB MSB, mode 3, 16-bit binary
+    out     0x43, al
+    mov     ax, TIMER_INTERRUPT_FRQ
+    out     0x40, al
+    mov     al, ah
+    out     0x40, al
+    pop     eax
+    ret
+        
 gdt_descriptor:
     dw    0 ; size
     dd    0 ; address
@@ -202,7 +174,5 @@ istruc  _gdt ; ring 3 data
                                     ;        32-bit protected mode
     at _gdt.base_hi,        db 0x00
 iend
-times 10 dq 0 ; make space for 10 more, for the future
+times 10 dq 0 ; make space for 10 more
 gdt_end:
-
-msg_welcome: db "[kernel] Who dares enter my domain?!", 0x00

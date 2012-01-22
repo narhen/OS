@@ -1,5 +1,5 @@
-#include "paging.h"
-#include "slab.h"
+#include <os/slab.h>
+#include <os/page.h>
 
 #define BUFCTL_END ~0
 
@@ -9,7 +9,7 @@
 
 #define SLAB_OBJ(mem, index, siz) (void *)(((char *)(mem)) + ((index) * (siz)))
 
-static linked_list_t cache_chain;
+static dllist_t cache_chain;
 static struct kmem_cache cache_cache = { .name = "kmem_cache" };
 static struct kmem_cache size_caches[] = {
     {.name = "size_8", .obj_size = 8, .num_pages = 1 },
@@ -63,8 +63,8 @@ static int kmem_cache_grow(struct kmem_cache *cache)
 
     /* if slab info is on the slab itself */
     if (!(cache->flags & SLINFO_OFF_SLAB)) {
-        pageclr((unsigned int *)(newslab =
-                    ((struct page_descriptor *)page_alloc(0))->paddr));
+        pageclr((unsigned int *)(newslab = (struct slab *)
+                    ((struct page_descriptor *)page_alloc(PAGEFL_SLAB))->paddr));
         newslab->mem = ((char *)newslab) + (sizeof(struct slab) + 
                 (sizeof(kmem_bufctl_t) * cache->num_objs));
 
@@ -75,10 +75,10 @@ static int kmem_cache_grow(struct kmem_cache *cache)
                 (sizeof(kmem_bufctl_t) * cache->num_objs));
         if (newslab == NULL)
             return 0; /* error */
-        pageclr((newslab->mem = ((struct page_descriptor *)page_alloc(0))->paddr));
+        pageclr((newslab->mem = (void *)((struct page_descriptor *)page_alloc(PAGEFL_SLAB))->paddr));
     }
     newslab->inuse = newslab->free = 0;
-    LINKED_LIST_INIT(&(newslab->list));
+    INIT_LIST(&(newslab->list));
 
     /* initialize the bufctl array */
     kmem_bufctl_init(slab_bufctl(newslab), cache->num_objs);
@@ -89,7 +89,7 @@ static int kmem_cache_grow(struct kmem_cache *cache)
     if (slabp == NULL) {
         cache->slabs_empty = newslab;
     } else {
-        llist_add_tail(&newslab->list, &slabp->list);
+        list_add_tail(&newslab->list, &slabp->list);
     }
 
     if (cache->ctor) {
@@ -123,18 +123,18 @@ static inline int kmem_update_bufctl_alloc(struct slab *slabp)
 
 static inline struct slab *cache_get_slab(struct kmem_cache *cachep, void *ptr)
 {
-    linked_list_t *tmp;
+    dllist_t *tmp;
     struct slab *i;
 
     for_each_item(tmp, &cachep->slabs_partial->list) {
-        i = llist_get_item(tmp, struct slab, list);
+        i = list_get_item(tmp, struct slab, list);
         if (ptr >= i->mem && ptr < i->mem +
                 (cachep->num_objs * cachep->obj_size))
             return i;
     }
 
     for_each_item(tmp, &cachep->slabs_full->list) {
-        i = llist_get_item(tmp, struct slab, list);
+        i = list_get_item(tmp, struct slab, list);
         if (ptr >= i->mem && ptr < i->mem +
                 (cachep->num_objs * cachep->obj_size))
             return i;
@@ -156,7 +156,7 @@ int kmem_cache_free(struct kmem_cache *cachep, void *ptr)
     objnr = ((unsigned long)slabp->mem - (unsigned long)ptr)/ cachep->obj_size;
 
     if (slabp->inuse == cachep->num_objs)
-        llist_move(&slabp->list, &cachep->slabs_partial->list);
+        list_move(&slabp->list, &cachep->slabs_partial->list);
 
     --slabp->inuse;
     kmem_update_bufctl_free(slabp, objnr);
@@ -165,7 +165,8 @@ int kmem_cache_free(struct kmem_cache *cachep, void *ptr)
 }
 
 static inline int kmem_slab_descriptor_free(struct kmem_cache *cachep,
-        struct slab *slabp) {
+        struct slab *slabp)
+{
     struct kmem_cache *tmp = size_caches;
     int desc_siz = sizeof(struct slab) +
         (cachep->num_objs * sizeof(kmem_bufctl_t));
@@ -188,20 +189,20 @@ static inline int kmem_slab_destroy(struct kmem_cache *cachep, struct slab *slab
         return 0;
     }
 
-    llist_unlink(&slabp->list);
+    list_unlink(&slabp->list);
     if (cachep->flags & SLINFO_OFF_SLAB) {
         for (i = 0; i < cachep->num_pages; ++i)
-            page_free(((char *)slabp->mem) + (PAGE_SIZE * i));
+            page_free((unsigned long *)(((char *)slabp->mem) + (PAGE_SIZE * i)));
         kmem_slab_descriptor_free(cachep, slabp);
     } else {
-        free_page(slabp);
+        page_free((unsigned long *)slabp);
     }
 }
 
 int kmem_cache_destroy(struct kmem_cache *cachep)
 {
-    linked_list_t *list;
-    struct slab *slabp;
+    dllist_t *list;
+    struct slab *slabp = NULL;
 
     if (cachep->slabs_full || cachep->slabs_partial) {
         /* error: some objects in the cache are beeing used */
@@ -209,7 +210,7 @@ int kmem_cache_destroy(struct kmem_cache *cachep)
     }
 
     for_each_item(list, &cachep->slabs_empty->list) {
-        slabp = llist_get_item(slabp, struct slab, list);
+        slabp = list_get_item(slabp, struct slab, list);
         kmem_slab_descriptor_free(cachep, slabp);
     }
 
@@ -226,7 +227,7 @@ static inline void *_cache_alloc(struct kmem_cache *cachep)
 
     ret = SLAB_OBJ(slabp->mem, slabp->free, objsiz);
     if (kmem_update_bufctl_alloc(slabp) == SLAB_FULL) {
-        llist_move(&slabp->list, &cachep->slabs_full->list);
+        list_move(&slabp->list, &cachep->slabs_full->list);
     }
 
     return ret;
@@ -253,7 +254,7 @@ void *kmem_cache_alloc(struct kmem_cache *cachp)
         kmem_cache_grow(cachp);
 
     if (cachp->slabs_partial == NULL) {
-        llist_move(&cachp->slabs_empty->list, &cachp->slabs_partial->list);
+        list_move(&cachp->slabs_empty->list, &cachp->slabs_partial->list);
     }
 
     ret = _cache_alloc(cachp);
@@ -288,7 +289,7 @@ struct kmem_cache *kmem_cache_create(const char *name, unsigned int flags,
 
     new_cache->bytes_wasted = kmem_cache_num_objs(new_cache);
 
-    llist_add_tail(&cache_chain, &new_cache->list);
+    list_add_tail(&cache_chain, &new_cache->list);
 
     return new_cache;
 }
@@ -301,7 +302,7 @@ static inline void kmem_setup_size_caches(void)
         spinlock_init(&tmp->spinlock);
         tmp->bytes_wasted = kmem_cache_num_objs(tmp);
         tmp->ctor = tmp->dtor = NULL;
-        LINKED_LIST_INIT(&tmp->list);
+        INIT_LIST(&tmp->list);
         tmp->num_allocs = tmp->highest_active = tmp->num_active_objs = 0;
         tmp->slabs_full = tmp->slabs_partial = tmp->slabs_empty = NULL;
         tmp++;
@@ -341,7 +342,7 @@ int slab_alloc_init(void)
     }
     struct kmem_cache *cache = &cache_cache;
 
-    LINKED_LIST_INIT(&cache->list);
+    INIT_LIST(&cache->list);
     cache->slabs_full = cache->slabs_partial = cache->slabs_empty = NULL;
     cache->ctor = tor;
     cache->dtor = tor;
@@ -358,7 +359,7 @@ int slab_alloc_init(void)
     spinlock_init(&cache->spinlock);
 
     cache->bytes_wasted = kmem_cache_num_objs(cache);
-    LINKED_LIST_INIT(&cache_chain);
+    INIT_LIST(&cache_chain);
 
     kmem_cache_grow(cache);
 

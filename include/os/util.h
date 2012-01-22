@@ -33,28 +33,35 @@ static inline void outb(short port, char data)
 {
     asm volatile("outb %%al, %%dx\n"
             :
-            : "a"(data), "d"(port));
+            : "a"(data), "d"(port)
+            : "eax", "edx");
 }
 
-static inline void inb(int port, char *data)
+static inline char inb(int port)
 {
+    int ret;
+
     asm volatile("inb %%dx, %%al\n"
-            : "=a"(*data)
-            : "d"(port));
+            : "=a"(ret)
+            : "d"(port)
+            : "edx");
+    return (char)ret;
 }
 
 static inline void wrmsr(int reg, int data_hi, int data_lo)
 {
     asm volatile("wrmsr\n"
             :
-            : "a"(data_lo), "d"(data_hi), "c"(reg));
+            : "a"(data_lo), "d"(data_hi), "c"(reg)
+            : "eax", "ecx", "edx");
 }
 
 static inline void rdmsr(int reg, int *data_hi, int *data_lo)
 {
     asm volatile("rdmsr\n"
             : "=a"(*data_lo), "=d"(*data_hi)
-            : "c"(reg));
+            : "c"(reg)
+            : "ecx");
 }
 
 static inline void cli(void)
@@ -65,6 +72,32 @@ static inline void cli(void)
 static inline void sti(void)
 {
     asm volatile("sti");
+}
+
+static void irq_set_mask(unsigned char irq)
+{
+    int port;
+    if (irq < 8)
+        port = 0x21;
+    else {
+        port = 0xa1;
+        irq -= 8;
+    }
+
+    outb(port, inb(port) | (1 << irq));
+}
+
+static void irq_clear_mask(unsigned char irq)
+{
+    int port;
+    if (irq < 8)
+        port = 0x21;
+    else {
+        port = 0xa1;
+        irq -= 8;
+    }
+
+    outb(port, inb(port) & ~(1 << irq));
 }
 
 #endif /* end of include guard: __UTIL_H */

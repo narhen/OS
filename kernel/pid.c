@@ -2,6 +2,7 @@
 #include <os/kpanic.h>
 #include <os/pid.h>
 #include <os/page.h>
+#include <os/scheduler.h>
 
 #define set_bit(map, n) (((char *)map)[n / 8] |= 1 << (n % 8))
 #define clear_bit(map, n) (((char *)map)[n / 8] &= ~(1 << (n % 8)))
@@ -14,7 +15,7 @@ inline void pid_init(void)
     /* Reserve a page for the pidmap.
      * Which gives us 4096*8=32768 available pids */
     pidmap = (unsigned char *)((struct page_descriptor *)page_alloc(PAGEFL_PINNED))->paddr;
-    memset(pidmap, 0, PAGE_SIZE);
+    kmemset(pidmap, 0, PAGE_SIZE);
     maxpid = PAGE_SIZE * 8 - 1;
 }
 
@@ -48,4 +49,9 @@ pid_t pid_alloc(void)
 inline void pid_free(pid_t pid)
 {
     clear_bit(pidmap, pid);
+}
+
+pid_t getpid(void)
+{
+    return current_running->pid;
 }

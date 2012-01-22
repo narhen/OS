@@ -11,6 +11,7 @@
 #define PAGEFL_PINNED       (1 << 1)
 #define PAGEFL_DMA          (1 << 2)
 #define PAGEFL_UNUSABLE     (1 << 3)
+#define PAGEFL_SLAB         (1 << 4)
 
 typedef struct page_descriptor {
     unsigned pagenum;
@@ -32,7 +33,7 @@ struct mem_chunk {
     unsigned flag;
 };
 
-extern int paging_init(struct memory_map *, int, unsigned long);
+extern int paging_init(struct memory_map *, int, unsigned long, int);
 extern struct page_descriptor *pages_alloc(int num, unsigned flag);
 extern inline struct page_descriptor *page_alloc(unsigned flag);
 extern int page_free(unsigned long *paddr);

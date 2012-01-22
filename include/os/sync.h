@@ -4,6 +4,7 @@
 typedef volatile int spinlock_t;
 
 #define DECLARE_SPINLOCK(name) spinlock_t name = 0
+inline void spinlock_init(spinlock_t *lock);
 inline void spinlock_acquire(spinlock_t *lock);
 inline void spinlock_release(spinlock_t *lock);
 

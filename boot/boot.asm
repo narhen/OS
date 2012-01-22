@@ -54,6 +54,7 @@ _start:
     mov dword   eax, cr0
     or  dword   eax, 1
     mov dword   cr0, eax
+    mov dword   ebx, SYS_BLOCKS
     jmp         0x08:SYS_LOADPOINT
 
 ; Prints a string to screen.

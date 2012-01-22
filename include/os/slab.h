@@ -1,15 +1,19 @@
 #ifndef __SLAB_H /* start of include guard */
 #define __SLAB_H
 
-#include "thread.h"
-#include "list.h"
+#include <os/list.h>
+#include <os/sync.h>
+
+#ifndef NULL
+#define NULL ((void *)0)
+#endif
 
 #define slab_bufctl(slabp) ((kmem_bufctl_t *)(((struct slab *)(slabp)) + 1))
 
 typedef unsigned int kmem_bufctl_t;
 
 typedef struct slab {
-    linked_list_t list;
+    dllist_t list;
 
     unsigned int inuse; /* number of objects in use */
     kmem_bufctl_t free; /* next free object, (index in the slab) */
@@ -18,7 +22,7 @@ typedef struct slab {
 } slab_t;
 
 typedef struct kmem_cache {
-    linked_list_t list;
+    dllist_t list;
 
     struct slab *slabs_full; /* slablist of full slabs (all objects allocated) */
     struct slab *slabs_partial; /* slablist of partially allocated slabs */

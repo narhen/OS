@@ -4,6 +4,11 @@
 
 #include <os/sync.h>
 
+inline void spinlock_init(spinlock_t *lock)
+{
+    *lock = 0;
+}
+
 inline void spinlock_acquire(spinlock_t *lock)
 {
     while (__sync_lock_test_and_set(lock, 1)) /* gcc builtin */

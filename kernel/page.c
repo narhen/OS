@@ -47,12 +47,13 @@ static inline void free_allocated(int num, unsigned char *bitmap)
     clear_bit(bitmap, num);
 }
 
-int paging_init(struct memory_map *map, int n, unsigned long max_addr)
+int paging_init(struct memory_map *map, int n, unsigned long max_addr, int kern_siz)
 {
     int i, j = 0;
     unsigned long addr = 0;
+    struct page_descriptor *tmp;
 
-    memset(mem_map[0].bitmap, 0, PAGE_SIZE);
+    kmemset(mem_map[0].bitmap, 0, PAGE_SIZE);
     mem_map[0].chunk_num = 0;
     for (i = 0; i < CHUNK_SIZE; ++i, addr += PAGE_SIZE) {
         mem_map[0].page[i].pagenum = i;
@@ -78,9 +79,16 @@ int paging_init(struct memory_map *map, int n, unsigned long max_addr)
         } else
             mem_map[0].page[i].flag = PAGEFL_UNUSABLE;
     }
-    /* TODO:
-     *  - mark all kernel-code pages PAGEFL_PINNED
-     */
+
+    /*  mark all kernel-code pages and page directory/tables PAGEFL_PINNED */
+    tmp = paddr_to_page(SYS_LOADPOINT - 0x5000);
+    j = kern_siz / 2;
+    if (kern_siz % 2)
+        ++j;
+    j += 5;
+    for (i = 0; i < j; ++i, ++tmp)
+        tmp->flag |= PAGEFL_PINNED;
+
 
     return 1;
 }
