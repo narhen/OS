@@ -2,7 +2,7 @@ CC = gcc
 LD = ld
 AS = nasm
 
-CFLAGS = -Wall -nostdinc -I ../include -O2 -m32 -g -DSYS_LOADPOINT=$(SYS_LOADPOINT)
+CFLAGS = -Wall -nostdinc -I ../include -O0 -m32 -g -DSYS_LOADPOINT=$(SYS_LOADPOINT)
 ASFLAGS = -f elf32 -Ox -DSYS_LOADPOINT=$(SYS_LOADPOINT)
 LDFLAGS = -x -T kernel.ld
 

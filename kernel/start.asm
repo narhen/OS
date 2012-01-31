@@ -6,6 +6,7 @@
 
 global _start
 extern init
+extern gdt
 
 section .text
 
@@ -47,7 +48,7 @@ _start:
     mov     es, ax
     mov     fs, ax
     mov     gs, ax
-    push    ebx
+    push    ebx ; kernel size in 512-byte blocks
     call    pit_init
     call    available_ram
     push    eax ; third argument
@@ -107,6 +108,7 @@ available_ram:
 ; set up a new gdt
 load_gdt:
     mov dword   eax, gdt_start
+    mov dword   [gdt], eax
     mov dword   [gdt_descriptor + 2], eax
     mov dword   eax, gdt_end
     sub dword   eax, gdt_start
@@ -124,6 +126,8 @@ pit_init:
     out     0x40, al
     pop     eax
     ret
+
+section .data
         
 gdt_descriptor:
     dw    0 ; size
@@ -174,5 +178,6 @@ istruc  _gdt ; ring 3 data
                                     ;        32-bit protected mode
     at _gdt.base_hi,        db 0x00
 iend
+
 times 10 dq 0 ; make space for 10 more
 gdt_end:

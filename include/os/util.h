@@ -33,8 +33,7 @@ static inline void outb(short port, char data)
 {
     asm volatile("outb %%al, %%dx\n"
             :
-            : "a"(data), "d"(port)
-            : "eax", "edx");
+            : "a"(data), "d"(port));
 }
 
 static inline char inb(int port)
@@ -43,8 +42,7 @@ static inline char inb(int port)
 
     asm volatile("inb %%dx, %%al\n"
             : "=a"(ret)
-            : "d"(port)
-            : "edx");
+            : "d"(port));
     return (char)ret;
 }
 
@@ -98,6 +96,10 @@ static void irq_clear_mask(unsigned char irq)
     }
 
     outb(port, inb(port) & ~(1 << irq));
+}
+
+static void enter_ring_3(void)
+{
 }
 
 #endif /* end of include guard: __UTIL_H */

@@ -37,24 +37,32 @@ _start:
     push word   BOOT_SEGMENT
     pop  word   ds
     pop  word   ss
-    mov  word   si, msg_loading
-    call        print
+    push word   0x00
+    pop         es
+
     call        mem_detect_e820
     mov dword   ecx, MEM_MAP_START - 4 ; store return value at this address
     mov dword   [es:ecx], eax ; es is 0 here
 
-    push word   0x00
+    mov  word   si, msg_loading
+    call        print
     mov word    di, SYS_LOADPOINT ; destination -
-    pop         es ;               buffer
     mov word    ax, 1 ; block to start read from
     mov word    cx, SYS_BLOCKS ; number of blocks to read
     call        read
+    mov word    si, msg_done
+    call        print
 
+    mov dword   ebx, SYS_BLOCKS
     call        load_gdt
+    ; enable A20 line
+    in          al, 0x92
+    or          al, 0x02
+    out         0x92, al
+
     mov dword   eax, cr0
     or  dword   eax, 1
     mov dword   cr0, eax
-    mov dword   ebx, SYS_BLOCKS
     jmp         0x08:SYS_LOADPOINT
 
 ; Prints a string to screen.
@@ -68,6 +76,46 @@ print:
     cmp byte    al, 0x0d
     jne         .loop
     ret
+
+;print_hex:
+;    push word   bp
+;    mov  word   bp, sp
+;    push dword  ecx
+;    push word   dx
+;    sub         sp, 0x100
+;    lea         ecx, [bp - 0x08]
+;    mov         dx, 0x00
+;    mov byte    [ecx], 0x0d
+;    dec         ecx
+;    mov byte    [ecx], 0x0a
+;    dec         ecx
+;.loop:
+;    mov         dx, ax
+;    and         dx, 0x0f
+;    cmp         dx, 0x0a
+;    jge         .here
+;    add         dx, 0x30
+;    jmp         .skip
+;.here:
+;    sub         dx, 0x0a
+;    add         dx, 0x61
+;.skip:
+;    mov byte    [ecx], dl
+;    dec         cx
+;    shr         ax, 4
+;    test        ax, ax
+;    jnz         .loop
+;    mov byte    [ecx], 'x'
+;    mov byte    [ecx - 1], '0'
+;    push        si
+;    lea         si, [ecx - 1]
+;    call        print
+;    pop         si
+;    add         sp, 0x100
+;    pop word    dx
+;    pop dword   ecx
+;    pop word    bp
+;    ret
 
 ; Reads the memory map with BIOS interrupt 0x15.
 ; Store the list, starting at address 0x0100:0x0000.
@@ -166,6 +214,7 @@ load_gdt:
     ret
 
 msg_loading: db "Loading kernel..", 0x0a, 0x0d
+msg_done: db "Done.. Transferring control to kernel", 0x0a, 0x0d
 
 gdt_descriptor:
     dw    0 ; size
@@ -202,10 +251,8 @@ gdt_end:
 
 times 446 - ($-$$) db 0x00
 
-; A valid FAT32 partition on a 4GB memory stick.
-; I needed this to be able to boot from the USB memorystick
-db 0x80, 0x00, 0xc1, 0xe1, 0x83, 0x7b, 0xfe, 0xf9
-db 0x08, 0x7d, 0x74, 0x00, 0xc8, 0xee, 0x02, 0x00
+db 0x80, 0x01, 0x01, 0x00, 0x83, 0xfe, 0xff, 0xff
+db 0x3f, 0x00, 0x00, 0x00, 0x02, 0x03, 0xa5, 0x0b
 
 times 64-16 db 0x00
 db 0x55, 0xAA

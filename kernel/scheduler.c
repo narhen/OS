@@ -4,12 +4,12 @@
 #include <os/kpanic.h>
 #include <os/util.h>
 
-extern int init(struct memory_map *, int, unsigned long);
 
 struct pcb *current_running;
 
 struct pcb the_architect;
 struct _tss global_tss = {0};
+int tss_index;
 
 static dllist_t run_queue;
 static dllist_t sleepers;
@@ -17,6 +17,7 @@ static dllist_t zombies;
 
 void the_architect_init(void)
 {
+    extern int init(struct memory_map *, int, unsigned long);
     struct page_descriptor *page;
 
     current_running = &the_architect;
@@ -33,35 +34,27 @@ void the_architect_init(void)
 
     the_architect.kern_esp = (long)page->paddr + (PAGE_SIZE * 2);
     the_architect.user_esp = 0;
+    /* cr3 is initialized in kernel/start.asm */
     asm("mov    %%cr3, %%eax\n"
         :"=a"(the_architect.p_dir));
     __asm__ __volatile__("mov   %%eax, %%esp\n"
                          "mov   $0, %%ebp\n"
-                         "push  $0\n"
                          "jmp   init\n"
-                         ::"a"(the_architect.kern_esp));
+                         :: "a"(the_architect.kern_esp));
+    /* dead code */
 }
 
 void scheduler_init(void)
 {
     global_tss.esp0 = the_architect.kern_esp;
     global_tss.ss0 = KERNEL_DS;
+    global_tss.link = 0x28; /* tss segment */
     global_tss.iomap_base_address = sizeof(struct _tss);
 
     INIT_LIST(&run_queue);
     INIT_LIST(&sleepers);
     INIT_LIST(&zombies);
     list_add(&the_architect.run_queue, &run_queue);
-}
-
-static inline void dispatch(struct pcb *old)
-{
-    __asm__ __volatile__("push  %%ebp\n"
-                         "mov   %%esp, %0\n"
-                         "mov   %1, %%esp\n"
-                         "pop   %%ebp\n"
-                         :: "m"(old->kern_esp), "m"(current_running->kern_esp)
-                        );
 }
 
 void schedule(void)

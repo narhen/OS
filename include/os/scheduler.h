@@ -12,8 +12,6 @@
 #define JOB_EXITING         (1 << 4)
 #define JOB_ZOMBIE          (1 << 5)
 
-#define IS_THREAD(pcb) (pcb->user_esp == 0)
-
 #define KERNEL_CS   0x08
 #define KERNEL_DS   0x10
 
@@ -75,5 +73,7 @@ extern void scheduler_init(void);
 extern void the_architect_init(void);
 
 extern struct pcb *current_running;
+extern struct _tss global_tss;
+extern int tss_index;
 
 #endif

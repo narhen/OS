@@ -36,7 +36,7 @@ void kputs(const char *str)
 {
     short *ptr;
 
-    spinlock_acquire(&screen_lock);
+//    spinlock_acquire(&screen_lock);
     if (line == 25) {
         scroll();
         line--;
@@ -45,7 +45,7 @@ void kputs(const char *str)
     ptr = (short *)VID_MEM + (80 * line++);
     for (; *str; ptr++, str++)
         *ptr = (short)(fgcolor << 8) | (short)*str;
-    spinlock_release(&screen_lock);
+//    spinlock_release(&screen_lock);
 }
 
 /* hex to string */
