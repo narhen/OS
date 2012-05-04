@@ -6,7 +6,7 @@ typedef struct dllist {
 } dllist_t;
 
 #define INIT_LIST(name) (name)->next = (name)->prev = (name)
-#define DECLARE_LIST(name) dllist_t name; INIT_LIST(&name)
+#define DECLARE_LIST(name) dllist_t name = {&name, &name};
 
 static inline void list_add_tail(dllist_t *new, dllist_t *list)
 {

@@ -4,7 +4,7 @@
 
 #define VID_MEM 0xb8000
 
-static DECLARE_SPINLOCK(screen_lock);
+static volatile DECLARE_SPINLOCK(screen_lock);
 static int line = 0, cur = 0;
 static char color = FGCOLOR_DEFAULT | BGCOLOR_DEFAULT;
 
@@ -22,11 +22,6 @@ inline void set_line(int n)
 {
     line = n;
     cur = 0;
-}
-
-void setcur(int i)
-{
-    cur = i;
 }
 
 static inline void scroll(void)
@@ -47,7 +42,7 @@ void kputs(const char *str)
 {
     short *ptr;
 
-//    spinlock_acquire(&screen_lock);
+    spinlock_acquire(&screen_lock);
     if (line == 25) {
         scroll();
         line--;
@@ -75,7 +70,7 @@ void kputs(const char *str)
         ++ptr;
         ++str;
     }
-    //    spinlock_release(&screen_lock);
+    spinlock_release(&screen_lock);
 }
 
 /* hex to string */

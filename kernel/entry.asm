@@ -6,39 +6,64 @@ section .text
 
 BITS 32
 
-%define ISR_PROLOGUE ; \
-    pusha ; \
-    push    ds ; \
-    push    fs ; \
-    push    gs ; \
-    push    es
+;%define ISR_PROLOGUE \
+;    pusha \
+;    push    ds \
+;    push    fs \
+;    push    gs \
+;    push    es
 
-%define ISR_EPILOGUE
-    pop     es ; \
-    pop     gs ; \
-    pop     fs ; \
-    pop     ds ; \
-    popa ; \
-    iret
+;%define ISR_EPILOGUE \
+;    pop     es \
+;    pop     gs \
+;    pop     fs \
+;    pop     ds \
+;    popa \
+;    iret
 
-%define SEND_EOI ; \
-    mov     al, 0x20 ; \
-    mov     dx, 0x20 ; \
-    outb    dx, al
+;%define SEND_EOI \
+;    mov     al, 0x20 \
+;    mov     dx, 0x20 \
+;    out     dx, al
 
 
 irq0_entry:
-    ISR_PROLOGUE
+    ;ISR_PROLOGUE ; 'dis shit aint working yo
+    pusha
+    push    ds
+    push    fs
+    push    gs
+    push    es
+
     sub     esp, 108
     fnsave  [esp]
-    SEND_EOI
+
+    ;SEND_EOI
+    mov     al, 0x20
+    mov     dx, 0x20
+    out     dx, al
+
     call    _yield
     frstor  [esp]
     add     esp, 108
-    ISR_EPILOGUE
+
+    ;ISR_EPILOGUE
+    pop     es
+    pop     gs
+    pop     fs
+    pop     ds
+    popa
+    iret
+
 
 syscall_entry:
-    ISR_PROLOGUE
+    ;ISR_PROLOGUE
+    pusha
+    push    ds
+    push    fs
+    push    gs
+    push    es
+
     push    edi ; 5. argument
     push    esi ; 4. argument
     push    ebx ; 3. argument
@@ -48,7 +73,14 @@ syscall_entry:
     add     eax, syscall_table
     call    eax
     add     esp, 20
-    ISR_EPILOGUE
+
+    ;ISR_EPILOGUE
+    pop     es
+    pop     gs
+    pop     fs
+    pop     ds
+    popa
+    iret
 
 page_fault_entry:
     push    eax ; save original eax

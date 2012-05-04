@@ -37,7 +37,10 @@ static inline void pic_init(void)
     outb(0xa1, 0xff);
 
     extern void irq0_entry(void);
-    trap_gate_set(0x32, (long)irq0_entry);
+    trap_gate_set(32, (long)irq0_entry);
+
+    outb(0x40, (unsigned char)11932);
+    outb(0x40, (unsigned char)11932 >> 8);
 }
 
 static inline void syscall_init(void)
@@ -143,6 +146,7 @@ int init(struct memory_map *map, int n, int kern_size)
     exceptions_init();
     syscall_init();
     idt_init();
+    pic_init();
 
     tss_index = gdt_gate_set((unsigned int)&global_tss + sizeof(struct _tss),
             (unsigned int)&global_tss , 0x89, 0xc);
@@ -151,11 +155,21 @@ int init(struct memory_map *map, int n, int kern_size)
             :: "a"(tmp));
 
 
+
     kprintf("Available memory: %u MB\n", statistics.max_mem / 1024 / 1024);
     kprintf("Kernel size: %d bytes\n", statistics.kernel_size * 512);
     kprintf("pid: %d\n", getpid());
 
+    outb(0x21, 0xfe); /* start the PIC */
 
-    while (1); /* double fault!? D: */
+    tmp = -1;
+    while (1) {
+        if (!(current_running->nr_switches % 3000) &&
+                tmp != current_running->nr_switches) {
+            kprintf("%d\n", current_running->nr_switches);
+            tmp = current_running->nr_switches;
+        }
+    }
+
     return 0;
 }

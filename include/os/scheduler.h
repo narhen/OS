@@ -25,6 +25,8 @@ struct pcb {
     struct _tss *tss;
     long kern_esp, user_esp;
 
+    unsigned nr_switches;
+
     dllist_t run_queue;
 };
 

@@ -3,6 +3,7 @@
 #include <os/boot.h>
 #include <os/kpanic.h>
 #include <os/util.h>
+#include <os/print.h>
 
 
 struct pcb *current_running;
@@ -11,9 +12,9 @@ struct pcb the_architect;
 struct _tss global_tss = {0};
 int tss_index;
 
-static dllist_t run_queue;
-static dllist_t sleepers;
-static dllist_t zombies;
+static DECLARE_LIST(run_queue);
+static DECLARE_LIST(sleepers);
+static DECLARE_LIST(zombies);
 
 void the_architect_init(void)
 {
@@ -25,6 +26,7 @@ void the_architect_init(void)
     the_architect.parent = &the_architect;
     the_architect.child = NULL;
     the_architect.status = JOB_RUNNING;
+    the_architect.nr_switches = 0;
 
     INIT_LIST(&the_architect.siblings);
     INIT_LIST(&the_architect.run_queue);
@@ -51,9 +53,6 @@ void scheduler_init(void)
     global_tss.link = 0x28; /* tss segment */
     global_tss.iomap_base_address = sizeof(struct _tss);
 
-    INIT_LIST(&run_queue);
-    INIT_LIST(&sleepers);
-    INIT_LIST(&zombies);
     list_add(&the_architect.run_queue, &run_queue);
 }
 
@@ -63,6 +62,8 @@ void schedule(void)
 
     current_running = list_get_item(run_queue.next, struct pcb, run_queue);
     current_running->status |= JOB_RUNNING;
+
+    ++old->nr_switches;
 
     if (old->status & ~JOB_RUNNING) {
         list_add(&old->run_queue, &run_queue);
