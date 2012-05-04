@@ -13,6 +13,7 @@
 #include <os/util.h>
 #include <os/print.h>
 #include <os/syscall.h>
+#include <string.h>
 
 struct {
     unsigned long max_mem;

@@ -1,5 +1,26 @@
 #include <os/print.h>
+#include <os/kpanic.h>
 #include <string.h>
+
+inline void get_reg_values(struct cpu_regiters *regs)
+{
+    __asm__ __volatile__(""
+        :"=a"(regs->eax), "=b"(regs->ebx),
+         "=c"(regs->ecx), "=d"(regs->edx),
+         "=S"(regs->esi), "=D"(regs->edi));
+    __asm__ __volatile__("mov   %%ebp, %%eax\n"
+                         "mov   %%esp, %%ecx\n"
+                         "mov   %%cs, %%edx\n"
+                         "mov   %%ds, %%ebx\n"
+                         "mov   %%ss, %%esi\n"
+                         "mov   %%fs, %%edi\n"
+                         :"=a"(regs->ebp), "=c"(regs->esp),
+                          "=d"(regs->cs), "=b"(regs->ds), "=S"(regs->ss),
+                          "=D"(regs->fs));
+    __asm__ __volatile__("mov   %%gs, %%eax\n"
+                         "mov   %%es, %%ebx\n"
+                         :"=a"(regs->gs), "=b"(regs->es));
+}
 
 static void clear_screen(void)
 {

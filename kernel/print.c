@@ -191,7 +191,7 @@ int kprintf(const char *fmt, ...)
 {
     /* yes yes, a possible buffer overflow.. I know.
      * I'm to lazy to do something about it, atm */
-    char buf[128];
+    char buf[1024];
     va_list ap;
     int ret;
 

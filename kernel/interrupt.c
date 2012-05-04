@@ -10,14 +10,23 @@ static struct __attribute__((packed)) {
     unsigned int base;
 } idtr = {.limit = sizeof(idt_table), .base = (unsigned int)&idt_table};
 
-#define die(error_code) \
+#define die(error_code) { \
     set_color((get_color() & 0xf0) | FGCOLOR_RED); \
     kprintf("%s - error code: %d eip: 0x%x, cs: 0x%x, eflags: 0x%x\n", \
             __FUNCTION__, error_code, eip, cs, eflags); \
     unsigned char *code = (char *)eip; \
-    kprintf("code - %x %x %x %x %x %x %x %x %x\n", code[0], code[1], code[2], \
-            code[3], code[4], code[5], code[6], code[7], code[8]); \
-    while (1);
+    kprintf("code; %x %x %x %x %x %x %x %x %x %x\n", code[0], code[1], code[2], \
+            code[3], code[4], code[5], code[6], code[7], code[8], code[9]); \
+    struct cpu_regiters regs; \
+    get_reg_values(&regs); \
+    kprintf("eax: 0x%x, ebx: 0x%x, ecx: 0x%x, edx: 0x%x\n" \
+            "esi: 0x%x, edi: 0x%x, ebp: 0x%x, esi: 0x%x\n" \
+            "cs: 0x%x, ds: 0x%x, ss: 0x%x, fs: 0x%x, gs: 0x%x, es: 0x%x\n", \
+            regs.eax, regs.ebx, regs.ecx, regs.edx, regs.esi, regs.edi, \
+            regs.ebp, regs.esp, regs.cs, regs.ds, regs.ss, regs.fs, regs.gs, \
+            regs.es); \
+    while (1); \
+}
 
 
 int interrupt_register(int n, unsigned long address, unsigned short selector,
