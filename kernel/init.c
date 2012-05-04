@@ -73,14 +73,32 @@ int gdt_gate_set(unsigned int limit, unsigned int base, char access, char flags)
 static void clear_screen(void)
 {
     int i;
-    char buf[81];
+    char buf[80];
     set_line(0);
+//    set_color(0x17);
 
     kmemset(buf, ' ', sizeof buf - 1);
     buf[sizeof buf - 1] = 0;
-    for (i = 0; i < 25; i++)
+    for (i = 0; i < 26; i++)
         kputs(buf);
     set_line(0);
+}
+
+unsigned long available_memory(struct memory_map *map, int n)
+{
+    int i;
+    unsigned long ret = 0, tmp;
+    #define shl(n, i) (n << i)
+
+    for (i = 0; i < n; i++, ++map) {
+        tmp = map->addr_lo + map->length_lo;
+        if (tmp > ret)
+            ret = tmp;
+
+        if (tmp == 0 && map->addr_lo + (map->length_lo - 1) != 0)
+            ret = map->addr_lo + (map->length_lo - 1);
+    }
+    return ret;
 }
 
 /* @arg map: an array over the memory of the computer. NOT SORTED!
@@ -94,22 +112,29 @@ static void clear_screen(void)
  * TODO: 
  *  - sort the memory map
  */
-int init(struct memory_map *map, int n, unsigned long max_addr, int kern_size)
+int init(struct memory_map *map, int n, int kern_size)
 {
     static volatile int first_time = 1;
     if (first_time) { /* map is always non-NULL the first time its called */
         sti();
+        clear_screen();
         first_time = 0;
-        statistics.max_mem = max_addr;
         statistics.kernel_size = kern_size;
 
-        clear_screen();
-        kprintf("init() @ %p", init);
-        kprintf("Setting up page allocator..");
-        paging_init(map, n, max_addr, kern_size);
-        kprintf("Initializing pid allocator..");
+        statistics.max_mem = available_memory(map, n);
+
+        int i = 0;
+        while (i < n) {
+            kprintf("map[%d] - addr: 0x%x%x, length: 0x%x%x, type: 0x%x\n",
+                    i, map[i].addr_hi, map[i].addr_lo, map[i].length_hi, map[i].length_lo, map[i].type);
+            ++i;
+        }
+
+        kprintf("Setting up page allocator..\n");
+        paging_init(map, n, statistics.max_mem, kern_size);
+        kprintf("Initializing pid allocator..\n");
         pid_init();
-        kprintf("Starting the architect..");
+        kprintf("Starting the architect..\n");
         the_architect_init(); /* never returns */
     }
     /* now the architect (the parent of all processes) is running */
@@ -124,9 +149,11 @@ int init(struct memory_map *map, int n, unsigned long max_addr, int kern_size)
     __asm__ __volatile__("ltr   %%ax\n"
             :: "a"(tmp));
 
-    kprintf("Available memory: %u MB", statistics.max_mem / 1024 / 1024);
-    kprintf("Kernel size: %d bytes", statistics.kernel_size * 512);
-    kprintf("pid: %d                    ", getpid());
+
+    kprintf("Available memory: %u MB\n", statistics.max_mem / 1024 / 1024);
+    kprintf("Kernel size: %d bytes\n", statistics.kernel_size * 512);
+    kprintf("pid: %d\n", getpid());
+
 
     while (1); /* double fault!? D: */
     return 0;

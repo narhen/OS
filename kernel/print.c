@@ -5,17 +5,28 @@
 #define VID_MEM 0xb8000
 
 static DECLARE_SPINLOCK(screen_lock);
-static int line = 0;
-static char fgcolor = FGCOLOR_DEFAULT;
+static int line = 0, cur = 0;
+static char color = FGCOLOR_DEFAULT | BGCOLOR_DEFAULT;
 
-inline void set_fgcolor(char c)
+inline void set_color(char c)
 {
-    fgcolor = c;
+    color = c;
+}
+
+inline char get_color(void)
+{
+    return color;
 }
 
 inline void set_line(int n)
 {
     line = n;
+    cur = 0;
+}
+
+void setcur(int i)
+{
+    cur = i;
 }
 
 static inline void scroll(void)
@@ -29,7 +40,7 @@ static inline void scroll(void)
     /* clear bottom line */
     src = (int *)VID_MEM + (40 * 24);
     while (src < (int *)VID_MEM + (40 * 25))
-        *src++ = 0x07200720;
+        *src++ = (((color << 8) | 0x20) << 16) | (color << 8) | 0x20;
 }
 
 void kputs(const char *str)
@@ -42,27 +53,46 @@ void kputs(const char *str)
         line--;
     }
 
-    ptr = (short *)VID_MEM + (80 * line++);
-    for (; *str; ptr++, str++)
-        *ptr = (short)(fgcolor << 8) | (short)*str;
-//    spinlock_release(&screen_lock);
+    cur %= 80;
+    ptr = (short *)VID_MEM + (80 * line) + cur;
+    for (; *str;) {
+        if (cur == 80) {
+            cur = 0;
+            if (++line > 24) {
+                scroll();
+                --line;
+            }
+        }
+        if (*str == '\n') {
+            ptr += 80 - cur;
+            cur = 0;
+            ++str;
+            line++;
+            continue;
+        } else
+            *ptr = (short)(color << 8) | (short)*str;
+        ++cur;
+        ++ptr;
+        ++str;
+    }
+    //    spinlock_release(&screen_lock);
 }
 
 /* hex to string */
 static char *htoa(char *s, unsigned n)
 {
-	int i, d;
+    int i = 0 ;
+    unsigned tmp;
 
-	i = 0;
-	do {
-		d = n % 16;
-		if (d < 10)
-			s[i++] = d + '0';
-		else
-			s[i++] = d - 10 + 'a';
-	} while ((n /= 16) > 0);
-	s[i] = 0;
-	kstrrev(s);
+    do {
+        tmp = n & 0xf;
+        if (tmp <= 9)
+            s[i++] = tmp + '0';
+        else
+            s[i++] = tmp - 10 + 'a';
+    } while ((n >>= 4));
+    s[i] = 0;
+    kstrrev(s);
 
     return &s[i];
 }

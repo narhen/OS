@@ -48,10 +48,8 @@ _start:
     mov     es, ax
     mov     fs, ax
     mov     gs, ax
-    push    ebx ; kernel size in 512-byte blocks
     call    pit_init
-    call    available_ram
-    push    eax ; third argument
+    push    ebx ; kernel size in 512-byte blocks
     push dword [0x1000] ; second argument
     push dword 0x1004 ; first argument
     call    init
@@ -82,27 +80,6 @@ setup_paging:
     mov     eax, cr0
     or      eax, 0x80000000 ; set the PE flag in cr0
     mov     cr0, eax
-    ret
-
-; returns max address in eax
-available_ram:
-    xor     ecx, ecx
-    xor     eax, eax
-    mov     edx, [0x1000] ; number of elements in the mem-map list
-    mov     esi, 0x1004
-.loop:
-    cmp     ecx, edx
-    jge     .return
-    mov     ebx, [esi]
-    add     ebx, [esi + 8]
-    add     esi, 24
-    cmp     eax, ebx
-    jge     .over
-    mov     eax, ebx
-.over:
-    inc     ecx
-    jmp     .loop
-.return:
     ret
 
 ; set up a new gdt

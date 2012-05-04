@@ -11,9 +11,12 @@ static struct __attribute__((packed)) {
 } idtr = {.limit = sizeof(idt_table), .base = (unsigned int)&idt_table};
 
 #define die(error_code) \
-    set_fgcolor(FGCOLOR_RED); \
-    kprintf("%s - error code: %d eip: 0x%x, cs: 0x%x, eflags: 0x%x", \
+    set_color((get_color() & 0xf0) | FGCOLOR_RED); \
+    kprintf("%s - error code: %d eip: 0x%x, cs: 0x%x, eflags: 0x%x\n", \
             __FUNCTION__, error_code, eip, cs, eflags); \
+    unsigned char *code = (char *)eip; \
+    kprintf("code - %x %x %x %x %x %x %x %x %x\n", code[0], code[1], code[2], \
+            code[3], code[4], code[5], code[6], code[7], code[8]); \
     while (1);
 
 

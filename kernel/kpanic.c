@@ -16,11 +16,12 @@ static void clear_screen(void)
 
 void _kpanic(const char *file, const char *function, int line, const char *msg)
 {
+    char color = get_color();
     clear_screen();
-    set_fgcolor(FGCOLOR_RED);
+    set_color(FGCOLOR_BLACK | BGCOLOR_RED);
     kprintf("KERNEL PANIC - %s: %s(), %d", file, function, line);
     kprintf("   %s", msg);
-    set_fgcolor(FGCOLOR_DEFAULT);
+    set_color(color);
 
     asm("hlt");
 }
