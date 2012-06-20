@@ -72,6 +72,7 @@ static inline void sti(void)
     asm volatile("sti");
 }
 
+/*
 static void irq_set_mask(unsigned char irq)
 {
     int port;
@@ -101,5 +102,5 @@ static void irq_clear_mask(unsigned char irq)
 static void enter_ring_3(void)
 {
 }
-
+*/
 #endif /* end of include guard: __UTIL_H */

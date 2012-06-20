@@ -56,20 +56,49 @@ void scheduler_init(void)
     list_add(&the_architect.run_queue, &run_queue);
 }
 
+static void dispatch(struct pcb *old)
+{
+    __asm__ __volatile__("mov   %%esp, %0\n"
+                         "mov   %%ebp, %1\n"
+                         :"=m"(old->kern_esp), "=m"(old->kern_ebp));
+                         
+    __asm__ __volatile__("mov   %%eax, %%esp\n"
+                         "mov   %%ecx, %%ebp\n"
+                         ::"a"(current_running->kern_esp),
+                          "c"(current_running->kern_ebp));
+
+    if (current_running->status & JOB_FIRST) {
+        current_running->status &= ~JOB_FIRST;
+        sti();
+        __asm__ __volatile__("jmp   *%%eax\n"
+                             ::"a"(current_running->entry));
+    }
+}
+
 void schedule(void)
 {
     struct pcb *old = current_running;
 
     current_running = list_get_item(run_queue.next, struct pcb, run_queue);
-    current_running->status |= JOB_RUNNING;
+    list_unlink(&current_running->run_queue);
+    list_add_tail(&current_running->run_queue, &run_queue);
 
     ++old->nr_switches;
 
-    if (old->status & ~JOB_RUNNING) {
-        list_add(&old->run_queue, &run_queue);
+    if (old->status & JOB_RUNNING) {
         old->status &= ~JOB_RUNNING;
         old->status |= JOB_SLEEPING;
     }
+
+    dispatch(old);
+
+    current_running->status |= JOB_RUNNING;
+    current_running->status &= ~JOB_SLEEPING;
+}
+
+inline void add_job(struct pcb *new_job)
+{
+    list_add_tail(&new_job->run_queue, &run_queue);
 }
 
 void _yield(void)

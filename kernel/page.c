@@ -17,6 +17,11 @@ inline struct page_descriptor *paddr_to_page(unsigned long paddr)
             paddr / PAGE_SIZE);
 }
 
+inline struct mem_chunk *paddr_to_mem_chunk(unsigned long paddr)
+{
+    return mem_map + (paddr >> 15);
+}
+
 static int get_free(int num, unsigned char *bitmap, unsigned siz)
 {
     unsigned mask = 1, tmp, i, j;
@@ -32,10 +37,10 @@ static int get_free(int num, unsigned char *bitmap, unsigned siz)
     for (i = 0; i < siz; ++i, bitmap++) {
         tmp = mask;
         for (j = 0; j < 8 - num; ++j, tmp <<= 1)
-            if ((tmp & *bitmap) == 0) {
+            if (!(tmp & *bitmap)) {
                 /* set bits and return number */
                 *bitmap |= tmp;
-                return i * 8 + j;
+                return (i << 3) + j;
             }
     }
 
@@ -80,14 +85,17 @@ int paging_init(struct memory_map *map, int n, unsigned long max_addr, int kern_
             mem_map[0].page[i].flag = PAGEFL_UNUSABLE;
     }
 
-    /*  mark all kernel-code pages and page directory/tables PAGEFL_PINNED */
+    /*  mark all kernel-code pages and page directory/tables pinned and unusable 
+     *  also sets, respectable bits in the bitmap bitmap*/
     tmp = paddr_to_page(SYS_LOADPOINT - 0x5000);
     j = kern_siz / 2;
     if (kern_siz % 2)
         ++j;
     j += 5;
-    for (i = 0; i < j; ++i, ++tmp)
-        tmp->flag |= PAGEFL_PINNED;
+    for (i = 0; i < j; ++i, ++tmp) {
+        tmp->flag |= (PAGEFL_PINNED | PAGEFL_UNUSABLE);
+        set_bit(paddr_to_mem_chunk(tmp->paddr)->bitmap, tmp->pagenum);
+    }
 
 
     return 1;

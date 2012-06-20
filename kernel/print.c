@@ -6,14 +6,14 @@
 
 static volatile DECLARE_SPINLOCK(screen_lock);
 static int line = 0, cur = 0;
-static char color = FGCOLOR_DEFAULT | BGCOLOR_DEFAULT;
+static unsigned char color = FGCOLOR_DEFAULT | BGCOLOR_DEFAULT;
 
-inline void set_color(char c)
+inline void set_color(unsigned char c)
 {
     color = c;
 }
 
-inline char get_color(void)
+inline unsigned char get_color(void)
 {
     return color;
 }
@@ -24,7 +24,7 @@ inline void set_line(int n)
     cur = 0;
 }
 
-static inline void scroll(void)
+static void scroll(void)
 {
     int *src = (int *)VID_MEM + 40, *dest = (int *)VID_MEM;
 
@@ -122,7 +122,7 @@ static char *sitoa(char *str, int num)
 
 /* supported formats: %%, %d, %u, %x, %p, %s
  * TODO:
- *  - return number of bytes cpoied into 'str' */
+ *  - return number of bytes copied into 'str' */
 int kvsprintf(char *str, const char *fmt, va_list ap)
 {
     char *ptr, *stmp;

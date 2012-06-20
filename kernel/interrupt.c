@@ -14,7 +14,7 @@ static struct __attribute__((packed)) {
     set_color((get_color() & 0xf0) | FGCOLOR_RED); \
     kprintf("%s - error code: %d eip: 0x%x, cs: 0x%x, eflags: 0x%x\n", \
             __FUNCTION__, error_code, eip, cs, eflags); \
-    unsigned char *code = (char *)eip; \
+    unsigned char *code = (unsigned char *)eip; \
     kprintf("code; %x %x %x %x %x %x %x %x %x %x\n", code[0], code[1], code[2], \
             code[3], code[4], code[5], code[6], code[7], code[8], code[9]); \
     struct cpu_regiters regs; \
@@ -25,7 +25,7 @@ static struct __attribute__((packed)) {
             regs.eax, regs.ebx, regs.ecx, regs.edx, regs.esi, regs.edi, \
             regs.ebp, regs.esp, regs.cs, regs.ds, regs.ss, regs.fs, regs.gs, \
             regs.es); \
-    while (1); \
+    __asm__("hlt"); \
 }
 
 

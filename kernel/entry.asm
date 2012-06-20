@@ -28,7 +28,6 @@ BITS 32
 
 
 irq0_entry:
-    ;ISR_PROLOGUE ; 'dis shit aint working yo
     pusha
     push    ds
     push    fs
@@ -47,7 +46,6 @@ irq0_entry:
     frstor  [esp]
     add     esp, 108
 
-    ;ISR_EPILOGUE
     pop     es
     pop     gs
     pop     fs

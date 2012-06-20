@@ -21,12 +21,15 @@ inline void pid_init(void)
 
 static pid_t next_free(unsigned n)
 {
-    unsigned char *bitmap = pidmap + (n / 8);
+    unsigned char *bitmap;
     unsigned tmp, i, j;
 
+    ++n;
+    bitmap = pidmap + (n / 8);
+
     for (i = n / 8; i < PAGE_SIZE - (n / 8); ++i, bitmap++)
-        for (j = n % 8, tmp = 1; j < 8; ++j, tmp <<= 1)
-            if ((tmp & *bitmap) == 0)
+        for (j = n % 8, tmp = 1 << j; j < 8; ++j, tmp <<= 1)
+            if (!(tmp & *bitmap))
                 return i * 8 + j;
 
     return -1;

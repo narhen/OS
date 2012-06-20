@@ -13,6 +13,8 @@
 #include <os/util.h>
 #include <os/print.h>
 #include <os/syscall.h>
+#include <os/kthread.h>
+
 #include <string.h>
 
 struct {
@@ -105,6 +107,27 @@ unsigned long available_memory(struct memory_map *map, int n)
     return ret;
 }
 
+static void thread1(void *args)
+{
+    int tmp = -1;
+
+    if (args != NULL)
+        kprintf("%s\n", args);
+
+    kprintf("New thread %d created\n", getpid());
+
+    while (1) {
+        if (!(current_running->nr_switches % 1000) &&
+                tmp != current_running->nr_switches) {
+            asm("mov %%esp, %0\n"
+                    :"=m"(tmp));
+            kprintf("pid %d: %d. esp: 0x%x\n", getpid(), current_running->nr_switches, tmp);
+
+            tmp = current_running->nr_switches;
+        }
+    }
+}
+
 /* @arg map: an array over the memory of the computer. NOT SORTED!
  * @arg n: number of elements in the map array
  * @arg max_addr: highest available address
@@ -141,6 +164,7 @@ int init(struct memory_map *map, int n, int kern_size)
         kprintf("Starting the architect..\n");
         the_architect_init(); /* never returns */
     }
+
     /* now the architect (the parent of all processes) is running */
     scheduler_init();
     exceptions_init();
@@ -154,22 +178,16 @@ int init(struct memory_map *map, int n, int kern_size)
     __asm__ __volatile__("ltr   %%ax\n"
             :: "a"(tmp));
 
-
-
     kprintf("Available memory: %u MB\n", statistics.max_mem / 1024 / 1024);
     kprintf("Kernel size: %d bytes\n", statistics.kernel_size * 512);
     kprintf("pid: %d\n", getpid());
 
     outb(0x21, 0xfe); /* start the PIC */
 
-    tmp = -1;
-    while (1) {
-        if (!(current_running->nr_switches % 3000) &&
-                tmp != current_running->nr_switches) {
-            kprintf("%d\n", current_running->nr_switches);
-            tmp = current_running->nr_switches;
-        }
-    }
+    for (tmp = 0; tmp < 9 ; ++tmp)
+        kthread_create(thread1, NULL);
+
+    thread1(NULL);
 
     return 0;
 }

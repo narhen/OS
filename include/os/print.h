@@ -17,8 +17,8 @@ extern int vsprintf(char *str, const char *fmt, va_list ap);
 extern int sprintf(char *str, const char *fmt, ...);
 extern int kprintf(const char *fmt, ...);
 extern void kputs(const char *str);
-extern inline void set_color(char c);
-extern inline char get_color(void);
+extern inline void set_color(unsigned char c);
+extern inline unsigned char get_color(void);
 extern inline void set_line(int n);
 
 #endif /* end of include guard: __PRINT_H */
