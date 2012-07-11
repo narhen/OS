@@ -55,14 +55,18 @@ _start:
 
     mov dword   ebx, SYS_BLOCKS
     call        load_gdt
+
     ; enable A20 line
     in          al, 0x92
     or          al, 0x02
     out         0x92, al
 
+    ; enable protected mode
     mov dword   eax, cr0
     or  dword   eax, 1
     mov dword   cr0, eax
+
+    ; jump to kernel
     jmp         0x08:SYS_LOADPOINT
 
 ; Prints a string to screen.

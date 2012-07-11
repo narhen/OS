@@ -2,6 +2,7 @@
 #define __PAGE_H
 
 #include <os/boot.h>
+#include <os/slab.h>
 
 #define PAGE_SIZE 4096
 #define PAGE_OFFSET 0xfff
@@ -18,6 +19,7 @@ typedef struct page_descriptor {
     unsigned long paddr;
     int num_refs;
     unsigned flag;
+//    struct kmem_cache *cache; /* only used if PAGEFL_SLAB is set */
 } page_descriptor_t;
 
 

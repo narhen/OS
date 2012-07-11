@@ -8,6 +8,13 @@ typedef struct dllist {
 #define INIT_LIST(name) (name)->next = (name)->prev = (name)
 #define DECLARE_LIST(name) dllist_t name = {&name, &name};
 
+#define for_each_item(ptr, list) \
+    for ((ptr) = (list)->next; (ptr) != (list); (ptr) = (ptr)->next)
+
+#define list_get_item(item, type, member) \
+    ((type *)((char *)(item) - (unsigned long)(&((type *)0)->member))) \
+
+
 static inline void list_add_tail(dllist_t *new, dllist_t *list)
 {
     new->next = list;
@@ -40,10 +47,15 @@ static inline void list_move(dllist_t *src, dllist_t *dest)
     list_add(src, dest);
 }
 
-#define for_each_item(ptr, list) \
-    for ((ptr) = (list)->next; (ptr) != (list); (ptr) = (ptr)->next)
+static inline int list_size(dllist_t *list)
+{
+    int ret = 1;
+    dllist_t *ptr;
 
-#define list_get_item(item, type, member) \
-    ((type *)((char *)(item) - (unsigned long)(&((type *)0)->member))) \
+    for_each_item(ptr, list) {
+        ++ret;
+    }
 
+    return ret;
+}
 #endif

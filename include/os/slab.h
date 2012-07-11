@@ -58,5 +58,7 @@ extern void *kmem_cache_alloc(struct kmem_cache *cachp);
 extern int kmem_cache_destroy(struct kmem_cache *cachep);
 extern int kmem_cache_free(struct kmem_cache *cachep, void *ptr);
 extern void *kmem_size_caches_alloc(unsigned int size);
+extern void *kmalloc(int size);
+//extern void kfree(void *ptr);
 
 #endif /* end of include guard: __SLAB_H */

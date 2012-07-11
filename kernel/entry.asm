@@ -1,6 +1,8 @@
 global irq0_entry, page_fault_entry, syscall_entry
+global irq1_entry
+
 extern schedule, _yield, page_fault, syscall_table
-extern kpanic
+extern kpanic, kbd_handler
 
 section .text
 
@@ -27,6 +29,7 @@ BITS 32
 ;    out     dx, al
 
 
+; PIT
 irq0_entry:
     pusha
     push    ds
@@ -53,6 +56,20 @@ irq0_entry:
     popa
     iret
 
+; keyboard
+irq1_entry:
+    cli
+    pusha
+
+    ;SEND_EOI
+    mov     al, 0x20
+    mov     dx, 0x20
+    out     dx, al
+
+    call    kbd_handler
+
+    popa
+    iret
 
 syscall_entry:
     ;ISR_PROLOGUE

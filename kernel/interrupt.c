@@ -12,15 +12,15 @@ static struct __attribute__((packed)) {
 
 #define die(error_code) { \
     set_color((get_color() & 0xf0) | FGCOLOR_RED); \
-    kprintf("%s - error code: %d eip: 0x%x, cs: 0x%x, eflags: 0x%x\n", \
+    kprintf_unlocked("%s - error code: %d eip: 0x%x, cs: 0x%x, eflags: 0x%x\n", \
             __FUNCTION__, error_code, eip, cs, eflags); \
     unsigned char *code = (unsigned char *)eip; \
-    kprintf("code; %x %x %x %x %x %x %x %x %x %x\n", code[0], code[1], code[2], \
+    kprintf_unlocked("code: %x %x %x %x %x %x %x %x %x %x\n", code[0], code[1], code[2], \
             code[3], code[4], code[5], code[6], code[7], code[8], code[9]); \
     struct cpu_regiters regs; \
     get_reg_values(&regs); \
-    kprintf("eax: 0x%x, ebx: 0x%x, ecx: 0x%x, edx: 0x%x\n" \
-            "esi: 0x%x, edi: 0x%x, ebp: 0x%x, esi: 0x%x\n" \
+    kprintf_unlocked("eax: 0x%x, ebx: 0x%x, ecx: 0x%x, edx: 0x%x\n" \
+            "esi: 0x%x, edi: 0x%x, ebp: 0x%x, esp: 0x%x\n" \
             "cs: 0x%x, ds: 0x%x, ss: 0x%x, fs: 0x%x, gs: 0x%x, es: 0x%x\n", \
             regs.eax, regs.ebx, regs.ecx, regs.edx, regs.esi, regs.edi, \
             regs.ebp, regs.esp, regs.cs, regs.ds, regs.ss, regs.fs, regs.gs, \
@@ -209,4 +209,79 @@ void idt_init(void)
 
     __asm__("lidt %0\n"
             :: "m"(idtr));
+}
+
+static inline int _12_to_24(int time)
+{
+    if (time & 0x80) {
+        /* PM */
+        time &= 0x7f;
+        time += 12;
+    } else if (time == 12)
+        time = 0;
+
+    return time;
+}
+
+/* store current time in 24-hour format in 'time'.
+ * bit 0-7 is seconds, bit 8-15 is minutes, bit 16-23 is hours,
+ * bit 24 - 31 is year.
+ * @return 1 if succesfully updated time. 0 if rtc is in update mode */
+int get_current_time(int *time)
+{
+    int status;
+    int tmp, _tmp;
+#define NMI_DISABLE 0x80
+#define BINARY_FORMAT 4
+#define HOUR24_FORMAT 2
+
+    outb(0x70, NMI_DISABLE | 0xa);
+    if (inb(0x71) & 0x80)
+        return 0; /* rtc is in update mode */
+
+    outb(0x70, NMI_DISABLE | 0xb);
+    status = inb(0x71);
+
+    outb(0x70, NMI_DISABLE | 0x9);
+    if (status & BINARY_FORMAT)
+        *time = inb(0x71) << 24;
+    else { /* BCD format */
+        tmp = inb(0x71);
+        *time = (((tmp / 16) * 10) + (tmp & 0xf)) << 24;
+    }
+
+    outb(0x70, NMI_DISABLE | 0x4);
+    if (status & BINARY_FORMAT)
+        tmp |= inb(0x71);
+    else { /* BCD format */
+        tmp = inb(0x71);
+        _tmp = tmp & 0x80; /* store msb, which indicates PM or AM */
+        tmp &= 0x7f;
+        tmp = (((tmp / 16) * 10) + (tmp & 0xf));
+    }
+    if (!(status & HOUR24_FORMAT))
+        tmp = _12_to_24(tmp | _tmp);
+    *time |= tmp << 16;
+
+    outb(0x70, NMI_DISABLE | 0x2);
+    if (status & BINARY_FORMAT)
+        *time |= inb(0x71) << 8;
+    else { /* BCD format */
+        tmp = inb(0x71);
+        *time |= (((tmp / 16) * 10) + (tmp & 0xf)) << 8;
+    }
+
+    outb(0x70, NMI_DISABLE | 0x0);
+    if (status & BINARY_FORMAT)
+        *time |= inb(0x71);
+    else { /* BCD format */
+        tmp = inb(0x71);
+        *time |= (((tmp / 16) * 10) + (tmp & 0xf));
+    }
+
+#undef NMI_DISABLE
+#undef BINARY_FORMAT
+#undef HOUR24_FORMAT
+
+    return 1;
 }

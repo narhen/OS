@@ -4,9 +4,9 @@
 
 #define VID_MEM 0xb8000
 
-static volatile DECLARE_SPINLOCK(screen_lock);
-static int line = 0, cur = 0;
-static unsigned char color = FGCOLOR_DEFAULT | BGCOLOR_DEFAULT;
+static DECLARE_SPINLOCK(screen_lock);
+static volatile int line = 0, cur = 0;
+static volatile unsigned char color = FGCOLOR_DEFAULT | BGCOLOR_DEFAULT;
 
 inline void set_color(unsigned char c)
 {
@@ -24,18 +24,28 @@ inline void set_line(int n)
     cur = 0;
 }
 
+inline void clear_line(int n)
+{
+    int *src;
+
+    if (n > 24)
+        return;
+
+    src = (int *)VID_MEM + (40 * n);
+    while (src < (int *)VID_MEM + (40 * (n + 1)))
+        *src++ = (((color << 8) | 0x20) << 16) | (color << 8) | 0x20;
+}
+
 static void scroll(void)
 {
     int *src = (int *)VID_MEM + 40, *dest = (int *)VID_MEM;
 
     /* move everyting one line up */
-    for (; src < (int *)VID_MEM + (40 * 25);)
+    for (; src < (int *)VID_MEM + (40 * 24);)
         *dest++ = *src++;
     
     /* clear bottom line */
-    src = (int *)VID_MEM + (40 * 24);
-    while (src < (int *)VID_MEM + (40 * 25))
-        *src++ = (((color << 8) | 0x20) << 16) | (color << 8) | 0x20;
+    clear_line(23);
 }
 
 void kputs(const char *str)
@@ -43,12 +53,12 @@ void kputs(const char *str)
     short *ptr;
 
     spinlock_acquire(&screen_lock);
-    if (line == 25) {
+    if (line == 24) {
         scroll();
         line--;
     }
 
-    cur %= 80;
+    cur %= 81;
     ptr = (short *)VID_MEM + (80 * line) + cur;
     for (; *str;) {
         if (cur == 80) {
@@ -70,6 +80,68 @@ void kputs(const char *str)
         ++ptr;
         ++str;
     }
+    spinlock_release(&screen_lock);
+}
+
+void kputs_unlocked(const char *str)
+{
+    short *ptr;
+
+    if (line == 24) {
+        scroll();
+        line--;
+    }
+
+    cur %= 81;
+    ptr = (short *)VID_MEM + (80 * line) + cur;
+    for (; *str;) {
+        if (cur == 80) {
+            cur = 0;
+            if (++line > 24) {
+                scroll();
+                --line;
+            }
+        }
+        if (*str == '\n') {
+            ptr += 80 - cur;
+            cur = 0;
+            ++str;
+            line++;
+            continue;
+        } else
+            *ptr = (short)(color << 8) | (short)*str;
+        ++cur;
+        ++ptr;
+        ++str;
+    }
+}
+
+void status_line(const char *str)
+{
+    int i = 0;
+    short *ptr = (short *)VID_MEM + (80 * 24);
+    unsigned char def_color = get_color();
+
+    spinlock_acquire(&screen_lock);
+
+    set_color(FGCOLOR_GREEN|BGCOLOR_DEFAULT);
+    /* Copy characters to video mapped memory */
+    while (*str && i < 80) {
+        *ptr = (short)(color << 8) | (short)*str;
+        ++str;
+        ++ptr;
+        ++i;
+    }
+
+    /* Fill the rest of the line with spaces */
+    while (i < 80) {
+        *ptr = (short)(color << 8) | (short)' ';
+        ++ptr;
+        ++i;
+    }
+
+    set_color(def_color);
+
     spinlock_release(&screen_lock);
 }
 
@@ -120,7 +192,7 @@ static char *sitoa(char *str, int num)
     return uitoa(str, (unsigned)num);
 }
 
-/* supported formats: %%, %d, %u, %x, %p, %s
+/* supported formats: %%, %d, %u, %x, %p, %s, %c
  * TODO:
  *  - return number of bytes copied into 'str' */
 int kvsprintf(char *str, const char *fmt, va_list ap)
@@ -128,6 +200,7 @@ int kvsprintf(char *str, const char *fmt, va_list ap)
     char *ptr, *stmp;
     unsigned utmp;
     int itmp;
+    char ctmp;
 
     for (; *fmt; fmt = ptr + 2) {
         ptr = kstrchr(fmt, '%');
@@ -161,6 +234,10 @@ int kvsprintf(char *str, const char *fmt, va_list ap)
             case '%':
                 *str++ = '%';
                 break;
+            case 'c':
+                ctmp = va_arg(ap, int);
+                *str++ = ctmp;
+                break;
             default:
                 /* unsupported format */
                 break;
@@ -190,11 +267,30 @@ int kprintf(const char *fmt, ...)
     va_list ap;
     int ret;
 
+    kmemset(buf, 0, sizeof buf);
+
     va_start(ap, fmt);
     ret = kvsprintf(buf, fmt, ap);
     va_end(ap);
 
     kputs(buf);
+
+    return ret;
+}
+
+int kprintf_unlocked(const char *fmt, ...)
+{
+    /* yes yes, a possible buffer overflow.. I know.
+     * I'm to lazy to do something about it, atm */
+    char buf[1024];
+    va_list ap;
+    int ret;
+
+    va_start(ap, fmt);
+    ret = kvsprintf(buf, fmt, ap);
+    va_end(ap);
+
+    kputs_unlocked(buf);
 
     return ret;
 }

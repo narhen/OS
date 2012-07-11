@@ -15,6 +15,7 @@ extern int interrupt_register(int n, unsigned long address, unsigned short selec
         unsigned char type, unsigned char priv);
 extern void exceptions_init(void);
 extern void idt_init(void);
+extern int get_current_time(int *time);
 
 #define trap_gate_set(n, addr) interrupt_register(n, addr, KERNEL_CS, 0xf, 0)
 #define int_gate_set(n, addr) interrupt_register(n, addr, KERNEL_CS, 0xe, 0)

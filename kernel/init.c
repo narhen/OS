@@ -14,8 +14,18 @@
 #include <os/print.h>
 #include <os/syscall.h>
 #include <os/kthread.h>
+#include <os/slab.h>
+
+#include <os/drivers/keyboard.h>
 
 #include <string.h>
+
+#define PIC1    0x20
+#define PIC2    0xA0
+#define PIC1_COMMAND    PIC1
+#define PIC1_DATA   (PIC1+1)
+#define PIC2_COMMAND    PIC2
+#define PIC2_DATA   (PIC2+1)
 
 struct {
     unsigned long max_mem;
@@ -24,22 +34,56 @@ struct {
 
 void *gdt;
 
+static inline void irq_set(int line)
+{
+    short port;
+    char value;
+
+    if (line < 8)
+        port = PIC1_DATA;
+    else if (line < 16)
+        port = PIC2_DATA;
+    else
+        return;
+
+    value = inb(port) | (1 << line);
+    outb(port, value);
+}
+
+static inline void irq_clear(int line)
+{
+    short port;
+    char value;
+
+    if (line < 8)
+        port = PIC1_DATA;
+    else if (line < 16)
+        port = PIC2_DATA;
+    else
+        return;
+
+    value = inb(port) & ~(1 << line);
+    outb(port, value);
+}
+
 static inline void pic_init(void)
 {
-    outb(0x20, 0x11);
-    outb(0x21, 32);
-    outb(0x21, 4);
-    outb(0x21, 1);
-    outb(0x21, 0xfb);
+    outb(PIC1_COMMAND, 0x11);
+    outb(PIC1_DATA, 32);
+    outb(PIC1_DATA, 4);
+    outb(PIC1_DATA, 1);
+    outb(PIC1_DATA, 0xfb); /* cascade */
 
-    outb(0xa0, 0x11);
-    outb(0xa1, 32 + 8);
-    outb(0xa1, 2);
-    outb(0xa1, 1);
-    outb(0xa1, 0xff);
+    outb(PIC2_COMMAND, 0x11);
+    outb(PIC2_DATA, 32 + 8);
+    outb(PIC2_DATA, 2);
+    outb(PIC2_DATA, 1);
+    outb(PIC2_DATA, 0xff);
 
     extern void irq0_entry(void);
+    extern void irq1_entry(void);
     trap_gate_set(32, (long)irq0_entry);
+    trap_gate_set(33, (long)irq1_entry);
 
     outb(0x40, (unsigned char)11932);
     outb(0x40, (unsigned char)11932 >> 8);
@@ -79,14 +123,9 @@ int gdt_gate_set(unsigned int limit, unsigned int base, char access, char flags)
 static void clear_screen(void)
 {
     int i;
-    char buf[80];
-    set_line(0);
-//    set_color(0x17);
 
-    kmemset(buf, ' ', sizeof buf - 1);
-    buf[sizeof buf - 1] = 0;
     for (i = 0; i < 26; i++)
-        kputs(buf);
+        clear_line(i);
     set_line(0);
 }
 
@@ -107,7 +146,7 @@ unsigned long available_memory(struct memory_map *map, int n)
     return ret;
 }
 
-static void thread1(void *args)
+static void thread_test(void *args)
 {
     int tmp = -1;
 
@@ -117,7 +156,7 @@ static void thread1(void *args)
     kprintf("New thread %d created\n", getpid());
 
     while (1) {
-        if (!(current_running->nr_switches % 1000) &&
+        if (!(current_running->nr_switches % 9000) &&
                 tmp != current_running->nr_switches) {
             asm("mov %%esp, %0\n"
                     :"=m"(tmp));
@@ -143,7 +182,11 @@ int init(struct memory_map *map, int n, int kern_size)
 {
     static volatile int first_time = 1;
     if (first_time) { /* map is always non-NULL the first time its called */
-        sti();
+        cli();
+
+        exceptions_init();
+        idt_init();
+
         clear_screen();
         first_time = 0;
         statistics.kernel_size = kern_size;
@@ -159,18 +202,20 @@ int init(struct memory_map *map, int n, int kern_size)
 
         kprintf("Setting up page allocator..\n");
         paging_init(map, n, statistics.max_mem, kern_size);
+
         kprintf("Initializing pid allocator..\n");
         pid_init();
+
         kprintf("Starting the architect..\n");
         the_architect_init(); /* never returns */
     }
 
+
     /* now the architect (the parent of all processes) is running */
     scheduler_init();
-    exceptions_init();
-    syscall_init();
-    idt_init();
     pic_init();
+    syscall_init();
+    slab_alloc_init();
 
     tss_index = gdt_gate_set((unsigned int)&global_tss + sizeof(struct _tss),
             (unsigned int)&global_tss , 0x89, 0xc);
@@ -178,16 +223,37 @@ int init(struct memory_map *map, int n, int kern_size)
     __asm__ __volatile__("ltr   %%ax\n"
             :: "a"(tmp));
 
+    sti();
+
+
+    kprintf("[KERNEL] Hi!\n");
     kprintf("Available memory: %u MB\n", statistics.max_mem / 1024 / 1024);
     kprintf("Kernel size: %d bytes\n", statistics.kernel_size * 512);
-    kprintf("pid: %d\n", getpid());
 
-    outb(0x21, 0xfe); /* start the PIC */
+    irq_clear(0); /* start the PIT */
+    irq_clear(1); /* enable keyboard driven interrupts */
 
-    for (tmp = 0; tmp < 9 ; ++tmp)
-        kthread_create(thread1, NULL);
+    for (tmp = 0; tmp < 4 ; ++tmp)
+        kthread_create(thread_test, NULL);
 
-    thread1(NULL);
+    char buffer[81];
+    struct __attribute__((packed)) {
+        unsigned char secs, mins, hours, year;
+    } time;
+
+    get_current_time((int *)&time);
+    unsigned long time_start = (time.hours * 60 * 60) + (time.mins * 60) + time.secs;
+
+    while (1) {
+        get_current_time((int *)&time);
+        ksprintf(buffer, "%d:%d:%d, uptime: %d - threads: %d", time.hours, time.mins, time.secs,
+                ((time.hours * 60 * 60) + (time.mins * 60) + time.secs) - time_start, list_size(&run_queue) - 1);
+        status_line(buffer);
+
+        char c = getchar();
+        if (c != 0)
+            kprintf("%c", c);
+    }
 
     return 0;
 }

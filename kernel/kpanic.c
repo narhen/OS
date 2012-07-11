@@ -28,20 +28,21 @@ static void clear_screen(void)
     char buf[81];
     set_line(0);
 
-    kmemset(buf, ' ', sizeof buf - 1);
-    buf[sizeof buf - 1] = 0;
+    kmemset(buf, ' ', 80);
+    buf[80] = 0;
     for (i = 0; i < 25; i++)
-        kputs(buf);
+        kputs_unlocked(buf);
     set_line(0);
 }
 
 void _kpanic(const char *file, const char *function, int line, const char *msg)
 {
     char color = get_color();
-    clear_screen();
+
+    set_line(0);
     set_color(FGCOLOR_BLACK | BGCOLOR_RED);
-    kprintf("KERNEL PANIC - %s: %s(), %d", file, function, line);
-    kprintf("   %s", msg);
+    kprintf_unlocked("KERNEL PANIC - %s: %s(), %d", file, function, line);
+    kprintf_unlocked("   %s", msg);
     set_color(color);
 
     asm("hlt");

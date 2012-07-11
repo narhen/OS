@@ -12,7 +12,7 @@ struct pcb the_architect;
 struct _tss global_tss = {0};
 int tss_index;
 
-static DECLARE_LIST(run_queue);
+DECLARE_LIST(run_queue);
 static DECLARE_LIST(sleepers);
 static DECLARE_LIST(zombies);
 
@@ -84,11 +84,7 @@ void schedule(void)
     list_add_tail(&current_running->run_queue, &run_queue);
 
     ++old->nr_switches;
-
-    if (old->status & JOB_RUNNING) {
-        old->status &= ~JOB_RUNNING;
-        old->status |= JOB_SLEEPING;
-    }
+    old->status &= ~JOB_RUNNING;
 
     dispatch(old);
 

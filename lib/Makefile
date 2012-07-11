@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -nostdinc -I ../include -O2 -m32
+CFLAGS = -Wall -nostdinc -I ../include -O0 -m32
 
 OBJS = sync.o string.o
 

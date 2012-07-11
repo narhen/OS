@@ -13,13 +13,12 @@ inline struct page_descriptor *pgnum_to_page(struct mem_chunk *chunk, int n)
 
 inline struct page_descriptor *paddr_to_page(unsigned long paddr)
 {
-    return pgnum_to_page(&mem_map[paddr / (CHUNK_SIZE * PAGE_SIZE)],
-            paddr / PAGE_SIZE);
+    return pgnum_to_page(mem_map + (paddr >> 27), paddr / PAGE_SIZE);
 }
 
 inline struct mem_chunk *paddr_to_mem_chunk(unsigned long paddr)
 {
-    return mem_map + (paddr >> 15);
+    return mem_map + (paddr >> 27);
 }
 
 static int get_free(int num, unsigned char *bitmap, unsigned siz)
@@ -96,6 +95,7 @@ int paging_init(struct memory_map *map, int n, unsigned long max_addr, int kern_
         tmp->flag |= (PAGEFL_PINNED | PAGEFL_UNUSABLE);
         set_bit(paddr_to_mem_chunk(tmp->paddr)->bitmap, tmp->pagenum);
     }
+    set_bit(paddr_to_mem_chunk(0)->bitmap, 0);
 
 
     return 1;

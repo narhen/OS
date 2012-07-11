@@ -1,4 +1,4 @@
-OBJS = kernel.o boot.o
+OBJS = drivers.o kernel.o boot.o 
 
 SYS_LOADPOINT = 0xd000
 SLP = SYS_LOADPOINT=$(SYS_LOADPOINT)
@@ -14,8 +14,12 @@ kernel.o:
 	$(MAKE) -C lib
 	$(MAKE) $(SLP) -C kernel
 
+drivers.o:
+	$(MAKE) -C drivers
+
 clean:
 	$(MAKE) -C boot clean
 	$(MAKE) -C kernel clean
 	$(MAKE) -C lib clean
+	$(MAKE) -C drivers clean
 	-$(RM) image

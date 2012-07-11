@@ -28,9 +28,19 @@ static struct kmem_cache size_caches[] = {
 
 static inline unsigned int kmem_cache_num_objs(struct kmem_cache *cache);
 
+//static inline struct kmem_cache *kmem_getcache(unsigned long slabaddr)
+//{
+//    struct page_descriptor *ret = paddr_to_page(slabaddr & ~PAGE_OFFSET);
+//
+//    return ret ? ret->cache : NULL;
+//}
+
 static inline void pageclr(unsigned int *addr)
 {
-    unsigned int *end = (unsigned int *)((unsigned char *)addr) + PAGE_SIZE;
+    unsigned int *end;
+
+    end = addr + (4096 >> 2);
+
     while (addr < end)
         *addr++ = 0;
 }
@@ -60,11 +70,14 @@ static int kmem_cache_grow(struct kmem_cache *cache)
 {
     struct slab *slabp;
     struct slab *newslab;
+    struct page_descriptor *page;
 
     /* if slab info is on the slab itself */
     if (!(cache->flags & SLINFO_OFF_SLAB)) {
-        pageclr((unsigned int *)(newslab = (struct slab *)
-                    ((struct page_descriptor *)page_alloc(PAGEFL_SLAB))->paddr));
+        page = page_alloc(PAGEFL_SLAB);
+//        page->cache = cache;
+        newslab = (struct slab *)page->paddr;
+        pageclr((unsigned int *)newslab);
         newslab->mem = ((char *)newslab) + (sizeof(struct slab) + 
                 (sizeof(kmem_bufctl_t) * cache->num_objs));
 
@@ -254,7 +267,12 @@ void *kmem_cache_alloc(struct kmem_cache *cachp)
         kmem_cache_grow(cachp);
 
     if (cachp->slabs_partial == NULL) {
-        list_move(&cachp->slabs_empty->list, &cachp->slabs_partial->list);
+        if (list_size(&cachp->slabs_empty->list) == 1) {
+            cachp->slabs_partial = cachp->slabs_empty;
+            cachp->slabs_empty = NULL;
+        } else {
+            list_move(cachp->slabs_empty->list.next, &cachp->slabs_partial->list);
+        }
     }
 
     ret = _cache_alloc(cachp);
@@ -309,7 +327,7 @@ static inline void kmem_setup_size_caches(void)
     }
 }
 
-/* calculate how many objects will fit in a slab.
+/* Calculate how many objects will fit in a slab.
  * Take in to consideration that the slabinfo (including the buctl array) may be
  * stored in the slab.
  * @return the number of bytes wasted */
@@ -367,3 +385,41 @@ int slab_alloc_init(void)
 
     return 1;
 }
+
+void *kmalloc(int size)
+{
+    if (size <= 0)
+        return NULL;
+    
+    if (size > 8192)
+        return NULL;
+    else if (size > 4096)
+        return kmem_cache_alloc(size_caches + 10);
+    else if (size > 2048)
+        return kmem_cache_alloc(size_caches + 9);
+    else if (size > 1024)
+        return kmem_cache_alloc(size_caches + 8);
+    else if (size > 512)
+        return kmem_cache_alloc(size_caches + 7);
+    else if (size > 256)
+        return kmem_cache_alloc(size_caches + 6);
+    else if (size > 128)
+        return kmem_cache_alloc(size_caches + 5);
+    else if (size > 64)
+        return kmem_cache_alloc(size_caches + 4);
+    else if (size > 32)
+        return kmem_cache_alloc(size_caches + 3);
+    else if (size > 16)
+        return kmem_cache_alloc(size_caches + 2);
+    else if (size > 8)
+        return kmem_cache_alloc(size_caches + 1);
+    else if (size > 0)
+        return kmem_cache_alloc(size_caches);
+
+    return NULL;
+}
+
+//void kfree(void *ptr)
+//{
+//    kmem_cache_free(kmem_getcache((unsigned long)ptr), ptr);
+//}

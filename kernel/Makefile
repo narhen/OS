@@ -12,8 +12,11 @@ KERNOBJS = start.o entry.o init.o page.o slab.o scheduler.o pid.o kthread.o \
 LIBPATH = ../lib
 LIBS = $(LIBPATH)/string.o $(LIBPATH)/sync.o
 
+DRIVERPATH = ../drivers
+DRIVERS = $(DRIVERPATH)/keyboard.o
+
 all: $(KERNOBJS)
-	$(LD) $(LDFLAGS) $(KERNOBJS) $(LIBS) -o start_sym
+	$(LD) $(LDFLAGS) $(KERNOBJS) $(LIBS) $(DRIVERS) -o start_sym
 	objcopy -O binary -R .comment -R .shstrtab start_sym start
 	$(MAKE) -C ../build
 	../build/mkimg ./start > image

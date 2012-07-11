@@ -86,6 +86,8 @@ extern struct pcb the_architect;
 extern struct _tss global_tss;
 extern int tss_index;
 
+extern dllist_t run_queue;
+
 /* This macro assumes the pcb is within the same page as the stack pointer
  * argument*/
 #define pcb_get(stack) \
