@@ -13,14 +13,14 @@ LIBPATH = ../lib
 LIBS = $(LIBPATH)/string.o $(LIBPATH)/sync.o
 
 DRIVERPATH = ../drivers
-DRIVERS = $(DRIVERPATH)/keyboard.o
+DRIVERS = $(DRIVERPATH)/keyboard.o $(DRIVERPATH)/disc.o
+
+FSPATH = ../fs
+FS = $(FSPATH)/fs.o
 
 all: $(KERNOBJS)
-	$(LD) $(LDFLAGS) $(KERNOBJS) $(LIBS) $(DRIVERS) -o start_sym
-	objcopy -O binary -R .comment -R .shstrtab start_sym start
-	$(MAKE) -C ../build
-	../build/mkimg ./start > image
-	$(RM) ./start
+	$(LD) $(LDFLAGS) $(KERNOBJS) $(LIBS) $(DRIVERS) $(FS) -o image.elf
+	objcopy -S -O binary -R .comment -R .shstrtab image.elf image
 
 page.o:
 	$(CC) $(CFLAGS) -c page.c
@@ -32,6 +32,5 @@ page.o:
 	$(AS) $(ASFLAGS) -o $@ $<
 
 clean:
-	-$(RM) image start_sym
+	-$(RM) image{,.elf} start_sym
 	-$(RM) *.o
-	$(MAKE) -C ../build clean

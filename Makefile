@@ -1,14 +1,16 @@
-OBJS = drivers.o kernel.o boot.o 
+OBJS = drivers.o fs.o kernel.o
 
-SYS_LOADPOINT = 0xd000
+SYS_LOADPOINT = 0x100000
 SLP = SYS_LOADPOINT=$(SYS_LOADPOINT)
 
 image: $(OBJS)
-	mv boot/boot ./image
-	cat kernel/image >> image
+	@mv kernel/image kernel.img
 
-boot.o: kernel.o
-	$(MAKE) $(SLP) SYS_BLOCKS=$(shell echo `wc -c kernel/image | sed -e 's/[^0-9]//g'` / 512 | bc)  -C boot/
+boot: build.o
+	$(MAKE) $(SLP) -C boot
+
+build.o:
+	$(MAKE) -C build
 
 kernel.o:
 	$(MAKE) -C lib
@@ -17,9 +19,14 @@ kernel.o:
 drivers.o:
 	$(MAKE) -C drivers
 
+fs.o:
+	$(MAKE) -C fs
+
 clean:
 	$(MAKE) -C boot clean
 	$(MAKE) -C kernel clean
 	$(MAKE) -C lib clean
 	$(MAKE) -C drivers clean
-	-$(RM) image
+	$(MAKE) -C build clean
+	$(MAKE) -C fs clean
+	-$(RM) kernel.img

@@ -24,9 +24,9 @@ typedef struct slab {
 typedef struct kmem_cache {
     dllist_t list;
 
-    struct slab *slabs_full; /* slablist of full slabs (all objects allocated) */
-    struct slab *slabs_partial; /* slablist of partially allocated slabs */
-    struct slab *slabs_empty; /* slablist of empty slabs (no objects allocated */
+    dllist_t slabs_full; /* slablist of full slabs (all objects allocated) */
+    dllist_t slabs_partial; /* slablist of partially allocated slabs */
+    dllist_t slabs_empty; /* slablist of empty slabs (no objects allocated */
 
     unsigned int obj_size; /* object size */
     unsigned int num_objs; /* slabsize in objects */
@@ -59,6 +59,6 @@ extern int kmem_cache_destroy(struct kmem_cache *cachep);
 extern int kmem_cache_free(struct kmem_cache *cachep, void *ptr);
 extern void *kmem_size_caches_alloc(unsigned int size);
 extern void *kmalloc(int size);
-//extern void kfree(void *ptr);
+extern void kfree(void *ptr);
 
 #endif /* end of include guard: __SLAB_H */

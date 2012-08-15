@@ -1,0 +1,9 @@
+- write a better page allocator
+- properly test slab allocator
+- write a disk driver
+    * in progress
+- implement IPC mechanisms
+- implement a file system driver
+    * in progress (FAT)
+- an executable file format loader (elf?)
+- user processes

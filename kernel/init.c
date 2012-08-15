@@ -18,6 +18,8 @@
 
 #include <os/drivers/keyboard.h>
 
+#include <os/fs/fs.h>
+
 #include <string.h>
 
 #define PIC1    0x20
@@ -210,12 +212,12 @@ int init(struct memory_map *map, int n, int kern_size)
         the_architect_init(); /* never returns */
     }
 
-
     /* now the architect (the parent of all processes) is running */
     scheduler_init();
     pic_init();
     syscall_init();
     slab_alloc_init();
+    fs_init();
 
     tss_index = gdt_gate_set((unsigned int)&global_tss + sizeof(struct _tss),
             (unsigned int)&global_tss , 0x89, 0xc);
@@ -223,18 +225,17 @@ int init(struct memory_map *map, int n, int kern_size)
     __asm__ __volatile__("ltr   %%ax\n"
             :: "a"(tmp));
 
-    sti();
+    sti(); /* General protection fault sometimes happen here */
 
-
-    kprintf("[KERNEL] Hi!\n");
     kprintf("Available memory: %u MB\n", statistics.max_mem / 1024 / 1024);
     kprintf("Kernel size: %d bytes\n", statistics.kernel_size * 512);
+    kprintf("System is loaded at 0x%x\n", SYS_LOADPOINT);
+
+    kprintf("ptable @ %p\n", ptable);
+    kprintf("partition type: 0x%x, start LBA: %d\n", ptable->type, ptable->start_lba);
 
     irq_clear(0); /* start the PIT */
     irq_clear(1); /* enable keyboard driven interrupts */
-
-    for (tmp = 0; tmp < 4 ; ++tmp)
-        kthread_create(thread_test, NULL);
 
     char buffer[81];
     struct __attribute__((packed)) {
@@ -243,6 +244,7 @@ int init(struct memory_map *map, int n, int kern_size)
 
     get_current_time((int *)&time);
     unsigned long time_start = (time.hours * 60 * 60) + (time.mins * 60) + time.secs;
+
 
     while (1) {
         get_current_time((int *)&time);

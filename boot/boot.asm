@@ -1,12 +1,17 @@
 ; boot.asm
 ;
 
-global _start
+; functions from this file
+global _start, copy, read
+
+; functions from fat.asm
+global fat_load, fat_read
+
 section .text
 
 BITS 16
 
-%define BOOT_SEGMENT 0x07c0
+%define STAGE2_SEGMENT 0x0d00
 %define STACK_SEGMENT 0x0700
 %define STACK_SIZE 4096
 
@@ -32,34 +37,56 @@ struc _gdt
 endstruc
 
 _start:
-    cli
-    push word   STACK_SEGMENT + STACK_SIZE
-    push word   BOOT_SEGMENT
+    push word   ax ; contains size of stage2 bootloader, in blocks
+    xor         eax, eax
+    push word   0x100
+    push word   STAGE2_SEGMENT
     pop  word   ds
-    pop  word   ss
-    push word   0x00
-    pop         es
+    pop  word   es
+
+
+    mov  word   si, msg_loading
+    call        print
+
+    mov         edi, 0x1000
+    mov         eax, 0
+    mov         cx, 1
+    call        read
+
+    mov         esi, 0x1be ; address to the first entry in the partition table
+    call        fat_load
+    cmp         eax, 1
+    jnz         error
+
+
+    ; enter unreal mode
+    push        ds
+    in          al, 0x92
+    or          al, 0x02
+    out         0x92, al
+    call        load_gdt
+    mov dword   eax, cr0
+    or  dword   eax, 1
+    mov dword   cr0, eax
+    mov         bx, 0x10
+    mov         ds, bx
+    and         al, 0xfe
+    mov         cr0, eax
+    pop         ds
+
+    ; load the kernel
+    call        fat_read ; returns 0 on success
+    test        eax, eax
+    jnz         error
 
     call        mem_detect_e820
     mov dword   ecx, MEM_MAP_START - 4 ; store return value at this address
     mov dword   [es:ecx], eax ; es is 0 here
 
-    mov  word   si, msg_loading
-    call        print
-    mov word    di, SYS_LOADPOINT ; destination -
-    mov word    ax, 1 ; block to start read from
-    mov word    cx, SYS_BLOCKS ; number of blocks to read
-    call        read
     mov word    si, msg_done
     call        print
 
-    mov dword   ebx, SYS_BLOCKS
     call        load_gdt
-
-    ; enable A20 line
-    in          al, 0x92
-    or          al, 0x02
-    out         0x92, al
 
     ; enable protected mode
     mov dword   eax, cr0
@@ -67,7 +94,10 @@ _start:
     mov dword   cr0, eax
 
     ; jump to kernel
-    jmp         0x08:SYS_LOADPOINT
+    mov word    [0x00], 0xd0ff ; \xff\xd0 == call eax
+    mov         eax, SYS_LOADPOINT
+    mov         ebx, 0
+    jmp         0x08:0xd000
 
 ; Prints a string to screen.
 ; The string-address must be loaded in si
@@ -80,46 +110,6 @@ print:
     cmp byte    al, 0x0d
     jne         .loop
     ret
-
-;print_hex:
-;    push word   bp
-;    mov  word   bp, sp
-;    push dword  ecx
-;    push word   dx
-;    sub         sp, 0x100
-;    lea         ecx, [bp - 0x08]
-;    mov         dx, 0x00
-;    mov byte    [ecx], 0x0d
-;    dec         ecx
-;    mov byte    [ecx], 0x0a
-;    dec         ecx
-;.loop:
-;    mov         dx, ax
-;    and         dx, 0x0f
-;    cmp         dx, 0x0a
-;    jge         .here
-;    add         dx, 0x30
-;    jmp         .skip
-;.here:
-;    sub         dx, 0x0a
-;    add         dx, 0x61
-;.skip:
-;    mov byte    [ecx], dl
-;    dec         cx
-;    shr         ax, 4
-;    test        ax, ax
-;    jnz         .loop
-;    mov byte    [ecx], 'x'
-;    mov byte    [ecx - 1], '0'
-;    push        si
-;    lea         si, [ecx - 1]
-;    call        print
-;    pop         si
-;    add         sp, 0x100
-;    pop word    dx
-;    pop dword   ecx
-;    pop word    bp
-;    ret
 
 ; Reads the memory map with BIOS interrupt 0x15.
 ; Store the list, starting at address 0x0100:0x0000.
@@ -173,37 +163,99 @@ mem_detect_e820:
     clc ; clear carry bit. (set on last int 0x15)
     ret
 
-dap:
-istruc dapacket
-    at dp_size, db dapacket_size
-    at dp_zero, db 0
-    at dp_numblocks, dw 0
-    at dp_buffer_lo, dw 0
-    at dp_buffer_hi, dw 0
-iend
-
 ; read from disk.
-; es:di address to write contents to
-; ax: block to start read from (LBA)
-; cx number of blocks to transfer
+; edi: address to write contents to
+; eax: block to start read from (LBA)
+; cx: number of blocks to transfer
 read:
-    mov word    si, dap
-    mov word    [si + dp_buffer_hi], es
-    mov word    [si + dp_buffer_lo], di
-    mov word    [si + dp_start_lba], ax
-    mov word    [si + dp_numblocks], cx
-    mov byte    ah, 0x42
+    push        eax
+    push        edi
+    push        ebx
+    push        edx
+    push        esi
+    mov         edx, edi
+    mov         edi, 0xc000
+
+.loop:
+    call        load_dap ; prepare the Disk Address Packet
+    push        eax
+    push        edx
+
+    mov word    ax, 0x4200
     mov byte    dl, 0x80 ; drive number
     int         0x13
-    jc          .error
-    test        ah, ah ; ah is 0 on success
-    jz          .return
-    mov byte    ah, 0xbb ; something weird is going on - 0xbb means undefined error
-    jmp         .return
-.error:
-    clc ; clear carry bit
-.return:
+    jc          error ; carry flag is set on error
+
+    pop         edx
+    mov         esi, edi
+    call        copy ; increments edx as a side effect
+    pop         eax
+    inc         eax
+    dec         ecx
+
+    cmp         ecx, 0
+    jne         .loop
+
+    mov         eax, 0
+    pop         esi
+    pop         edx
+    pop         ebx
+    pop         edi
+    pop         eax
     ret
+
+
+error:
+    mov         si, msg_error
+    call        print
+    hlt
+
+; edi: address
+; eax: block to read from
+load_dap:
+    push        edx
+
+    mov         edx, edi
+    mov word    si, dap
+    mov word    [si + dp_buffer_lo], dx
+    sar         edx, 16
+    mov word    [si + dp_buffer_hi], dx
+    mov dword   [si + dp_start_lba], eax
+    mov word    [si + dp_numblocks], 1
+
+    pop         edx
+    ret
+
+
+; copy 512 bytes from source to destination.
+; edx: destination
+; esi: source
+copy:
+    push        ds
+    push        ecx
+    push        edi
+    push        eax
+
+    push        0
+    pop         ds
+    mov         ecx, 512
+
+.loop:
+    mov dword   eax, [esi]
+    mov byte    [edx], al
+    inc         esi
+    inc         edx
+    dec         ecx
+    cmp         ecx, 0
+    jne         .loop
+
+    pop     eax
+    pop     edi
+    pop     ecx
+    pop     ds
+    ret
+
+%include "fat.asm"
 
 load_gdt:
     xor dword   eax, eax
@@ -218,7 +270,21 @@ load_gdt:
     ret
 
 msg_loading: db "Loading kernel..", 0x0a, 0x0d
-msg_done: db "Done.. Transferring control to kernel", 0x0a, 0x0d
+msg_done: db "Done.. Starting kernel", 0x0a, 0x0d
+msg_error: db "There was an error loading the kernel!", 0x0a, 0x0d
+
+align 4
+dap: ; structure used for transferring bytes from disk into memory
+istruc dapacket
+    at dp_size, db dapacket_size
+    at dp_zero, db 0
+    at dp_numblocks, dw 0
+    at dp_buffer_lo, dw 0
+    at dp_buffer_hi, dw 0
+    at dp_start_lba, dq 0
+iend
+
+
 
 gdt_descriptor:
     dw    0 ; size
@@ -252,11 +318,3 @@ istruc  _gdt ; ring 0 data
     at _gdt.base_hi,        db 0x00
 iend
 gdt_end:
-
-times 446 - ($-$$) db 0x00
-
-db 0x80, 0x01, 0x01, 0x00, 0x83, 0xfe, 0xff, 0xff
-db 0x3f, 0x00, 0x00, 0x00, 0x02, 0x03, 0xa5, 0x0b
-
-times 64-16 db 0x00
-db 0x55, 0xAA

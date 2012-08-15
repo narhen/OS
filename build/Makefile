@@ -1,7 +1,9 @@
 CC = gcc
 CFLAGS = -Wall
 
-all:
+all: build.o
+
+build.o:
 	$(CC) $(CFLAGS) -o mkimg mkimg.c
 
 clean:

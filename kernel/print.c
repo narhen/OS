@@ -69,10 +69,13 @@ void kputs(const char *str)
             }
         }
         if (*str == '\n') {
-            ptr += 80 - cur;
-            cur = 0;
             ++str;
-            line++;
+            cur = 0;
+            if (++line > 24) {
+                scroll();
+                --line;
+            }
+            ptr = (short *)VID_MEM + (80 * line) + cur;
             continue;
         } else
             *ptr = (short)(color << 8) | (short)*str;

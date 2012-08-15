@@ -5,6 +5,8 @@
 ;
 
 global _start
+global disk_read
+
 extern init
 extern gdt
 
@@ -17,10 +19,6 @@ BITS 32
 
 %define HZ 100
 %define TIMER_INTERRUPT_FRQ 1193180 / HZ
-
-%if PAGE_DIRECTORY + 4096 * 5 - 1 >= SYS_LOADPOINT
-    %error "Not enough space for page directories and tables!"
-%endif
 
 struc _gdt
     .limit_lo:      resw 1 ; limit 0-15
@@ -39,7 +37,6 @@ _start:
     mov     es, ax
     mov     fs, ax
     mov     gs, ax
-    call    setup_paging
     call    load_gdt
     ; reload segment regsters after we have changed gdt
     mov     ax, 0x10
@@ -48,8 +45,8 @@ _start:
     mov     es, ax
     mov     fs, ax
     mov     gs, ax
+    call    setup_paging
     call    pit_init
-    push    ebx ; kernel size in 512-byte blocks
     push dword [0x1000] ; second argument
     push dword 0x1004 ; first argument
     call    init
@@ -58,14 +55,16 @@ _start:
 ; set up paging and 1 to 1 mapping for the first 16 MB of RAM
 setup_paging:
 %define PERMISSION_BITS 0x07
-    mov dword   [PAGE_DIRECTORY], (PAGE_DIRECTORY + 4096)
-    or  dword   [PAGE_DIRECTORY], PERMISSION_BITS
-    mov dword   [PAGE_DIRECTORY + 4], PAGE_DIRECTORY + (4096 * 2)
-    or  dword   [PAGE_DIRECTORY + 4], PERMISSION_BITS
-    mov dword   [PAGE_DIRECTORY + 8], PAGE_DIRECTORY + (4096 * 3)
-    or  dword   [PAGE_DIRECTORY + 8], PERMISSION_BITS
-    mov dword   [PAGE_DIRECTORY + 12], PAGE_DIRECTORY + (4096 * 4)
-    or  dword   [PAGE_DIRECTORY + 12], PERMISSION_BITS
+    mov dword   eax, PAGE_DIRECTORY
+
+    mov dword   [eax],  (PAGE_DIRECTORY + 4096)
+    or dword    [eax], PERMISSION_BITS
+    mov dword   [eax + 4], PAGE_DIRECTORY + (4096 * 2)
+    or  dword   [eax + 4], PERMISSION_BITS
+    mov dword   [eax + 8], PAGE_DIRECTORY + (4096 * 3)
+    or  dword   [eax + 8], PERMISSION_BITS
+    mov dword   [eax + 12], PAGE_DIRECTORY + (4096 * 4)
+    or  dword   [eax + 12], PERMISSION_BITS
 
     mov     eax, 0xfff007 ; 16 MB
     mov     edi, PAGE_DIRECTORY + (4096 * 5) - 4 ; last entry in last page table

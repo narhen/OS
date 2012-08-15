@@ -25,7 +25,13 @@ static struct __attribute__((packed)) {
             regs.eax, regs.ebx, regs.ecx, regs.edx, regs.esi, regs.edi, \
             regs.ebp, regs.esp, regs.cs, regs.ds, regs.ss, regs.fs, regs.gs, \
             regs.es); \
-    __asm__("hlt"); \
+     long *stack = (long *)regs.esp; \
+     kprintf_unlocked("Stack dump:\n"); \
+     kprintf_unlocked("%p: 0x%x 0x%x 0x%x 0x%x\n", \
+             stack, stack[0], stack[1], stack[2], stack[3]); \
+     kprintf_unlocked("%p: 0x%x 0x%x 0x%x 0x%x\n", \
+             &stack[4], stack[4], stack[5], stack[6], stack[7]); \
+     __asm__("hlt"); \
 }
 
 
@@ -128,9 +134,9 @@ void stack_segment_fault(long error_code, long eip, long cs, long eflags, long e
 }
 
 /* esp and ss is only valid if the privilege-level is changed */
-void general_protection(long error_code, long eip, long cs, long eflags, long esp, long ss)
+void general_protection(long eip, long cs, long eflags, long esp, long ss)
 {
-    die(error_code);
+    die(0);
 }
 
 /* esp and ss is only valid if the privilege-level is changed */

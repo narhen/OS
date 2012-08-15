@@ -85,12 +85,20 @@ int paging_init(struct memory_map *map, int n, unsigned long max_addr, int kern_
     }
 
     /*  mark all kernel-code pages and page directory/tables pinned and unusable 
-     *  also sets, respectable bits in the bitmap bitmap*/
-    tmp = paddr_to_page(SYS_LOADPOINT - 0x5000);
+     *  also sets respectable bits in the bitmap*/
+    long pgdir;
+    asm("mov    %%cr3, %%eax\n"
+        : "=a"(pgdir));
+    tmp = paddr_to_page(pgdir);
+    for (i = 0; i < 5; ++i, ++tmp) {
+        tmp->flag |= (PAGEFL_PINNED | PAGEFL_UNUSABLE);
+        set_bit(paddr_to_mem_chunk(tmp->paddr)->bitmap, tmp->pagenum);
+    }
+
+    tmp = paddr_to_page(SYS_LOADPOINT);
     j = kern_siz / 2;
     if (kern_siz % 2)
         ++j;
-    j += 5;
     for (i = 0; i < j; ++i, ++tmp) {
         tmp->flag |= (PAGEFL_PINNED | PAGEFL_UNUSABLE);
         set_bit(paddr_to_mem_chunk(tmp->paddr)->bitmap, tmp->pagenum);

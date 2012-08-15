@@ -36,6 +36,13 @@ static inline void outb(short port, char data)
             : "a"(data), "d"(port));
 }
 
+static inline void outw(short port, short data)
+{
+    asm volatile("outw %%ax, %%dx\n"
+        :
+        : "a"(data), "d"(port));
+}
+
 static inline char inb(int port)
 {
     int ret;
@@ -44,6 +51,16 @@ static inline char inb(int port)
             : "=a"(ret)
             : "d"(port));
     return (char)ret;
+}
+
+static inline short inw(int port)
+{
+    int ret;
+
+    asm volatile("inw %%dx, %%ax\n"
+            : "=a"(ret)
+            : "d"(port));
+    return (short)ret;
 }
 
 static inline void wrmsr(int reg, int data_hi, int data_lo)

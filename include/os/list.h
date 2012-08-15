@@ -49,7 +49,7 @@ static inline void list_move(dllist_t *src, dllist_t *dest)
 
 static inline int list_size(dllist_t *list)
 {
-    int ret = 1;
+    int ret = 0;
     dllist_t *ptr;
 
     for_each_item(ptr, list) {

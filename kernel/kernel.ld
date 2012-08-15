@@ -5,6 +5,6 @@ OUTPUT_ARCH(i386)
 
 SECTIONS
 {
-    . = 0xd000;
+    . = 0x100000;
     .text : { *(.text) }
 }

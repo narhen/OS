@@ -19,7 +19,7 @@ typedef struct page_descriptor {
     unsigned long paddr;
     int num_refs;
     unsigned flag;
-//    struct kmem_cache *cache; /* only used if PAGEFL_SLAB is set */
+    struct kmem_cache *cache; /* only used if PAGEFL_SLAB is set */
 } page_descriptor_t;
 
 
